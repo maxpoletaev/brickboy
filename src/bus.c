@@ -4,10 +4,12 @@
 #include "common.h"
 #include "mapper.h"
 #include "bus.h"
+#include "cpu.h"
 
 void
 gb_bus_reset(gb_bus_t *bus)
 {
+    gb_cpu_reset(bus->cpu);
     gb_mapper_reset(bus->mapper);
 }
 
@@ -38,4 +40,11 @@ gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
     } else {
         GB_TRACE("unhandled write to 0x%04X", addr);
     }
+}
+
+void
+gb_bus_step(gb_bus_t *bus)
+{
+    bus->cycles += 1;
+    gb_cpu_step(bus->cpu, bus);
 }

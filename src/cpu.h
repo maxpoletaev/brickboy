@@ -1,7 +1,8 @@
-#ifndef OHMYBOY_CPU_H
-#define OHMYBOY_CPU_H
+#ifndef BRICKBOY_CPU_H
+#define BRICKBOY_CPU_H
 
 #include <stdint.h>
+
 #include "bus.h"
 
 typedef struct {
@@ -12,7 +13,7 @@ typedef struct {
     uint8_t unused : 4;
 } gb_cpu_flags_t;
 
-typedef struct {
+typedef struct gb_cpu_t {
     // AF register
     union {
         uint16_t af;
@@ -96,6 +97,8 @@ typedef enum {
 
 typedef struct gb_opcode_t gb_opcode_t;
 
+typedef struct gb_bus_t gb_bus_t;
+
 typedef void (*cpu_handler_t)(
     gb_cpu_t *cpu,
     gb_bus_t *bus,
@@ -108,11 +111,11 @@ struct gb_opcode_t {
     gb_operand_t target;
     gb_operand_t source;
     cpu_handler_t handler;
-    char *mnemonic;
+    const char *mnemonic;
 };
 
 void gb_cpu_reset(gb_cpu_t *cpu);
 
 void gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus);
 
-#endif //OHMYBOY_CPU_H
+#endif //BRICKBOY_CPU_H

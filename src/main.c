@@ -12,78 +12,54 @@
 int
 main(int argc, char **argv)
 {
-    gb_rom_t *rom = NULL;
-    gb_mapper_t *mapper = NULL;
+    gb_mapper_t mapper = {0};
+    gb_rom_t rom = {0};
+    gb_bus_t bus = {0};
+    gb_cpu_t cpu = {0};
 
     if (argc != 2) {
         GB_TRACE("usage: %s <rom>", argv[0]);
-        goto error;
+        return 1;
     }
 
     char *rom_filename = argv[1];
     if (access(rom_filename, R_OK) != 0) {
         GB_TRACE("file not found: %s", rom_filename);
-        goto error;
+        goto cleanup;
     }
 
-    rom = calloc(1, sizeof(gb_rom_t));
-    if (rom == NULL) {
-        GB_TRACE("failed to allocate rom memory");
-        goto error;
-    }
-
-    if (gb_rom_open(rom, rom_filename) != 0) {
+    if (gb_rom_open(&rom, rom_filename) != GB_OK) {
         GB_TRACE("failed to open rom file");
-        goto error;
+        goto cleanup;
     }
 
-    mapper = calloc(1, sizeof(gb_mapper_t));
-    if (mapper == NULL) {
-        GB_TRACE("failed to allocate mapper memory");
-        goto error;
-    }
-
-    if (gb_mapper_init(mapper, rom) != 0) {
-        GB_TRACE("failed to initialize mapper");
-        goto error;
-    }
-
-    char *title = gb_cstring(rom->header->title, sizeof(rom->header->title));
-    GB_LOG("ROM loaded: %s", title);
+    char *title = gb_cstring(rom.header->title, sizeof(rom.header->title));
+    GB_LOG("rom loaded: %s (%d)", title, rom.header->cartridge_type);
     free(title);
 
-    gb_bus_t bus = {0};
-    bus.mapper = mapper;
+    if (gb_mapper_init(&mapper, &rom) != GB_OK) {
+        GB_TRACE("failed to initialize mapper");
+        goto cleanup;
+    }
+
+    bus.cpu = &cpu;
+    bus.mapper = &mapper;
     gb_bus_reset(&bus);
 
-    gb_cpu_t cpu = {0};
-    gb_cpu_reset(&cpu);
-
     while (1) {
-        gb_cpu_step(&cpu, &bus);
+        gb_bus_step(&bus);
         sleep(1);
     }
 
-    gb_mapper_free(mapper);
-    free(mapper);
-
-    gb_rom_free(rom);
-    free(rom);
+    gb_mapper_free(&mapper);
+    gb_rom_free(&rom);
 
     return 0;
 
+cleanup:
 
-error:
-
-    if (mapper != NULL) {
-        gb_mapper_free(mapper);
-        free(mapper);
-    }
-
-    if (rom != NULL) {
-        gb_rom_free(rom);
-        free(rom);
-    }
+    gb_mapper_free(&mapper);
+    gb_rom_free(&rom);
 
     return 1;
 }

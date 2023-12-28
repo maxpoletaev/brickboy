@@ -54,9 +54,16 @@ gb_mapper_reset(gb_mapper_t *mapper)
 static inline void
 gb_mapper_free(gb_mapper_t *mapper)
 {
+    if (mapper->vt == NULL)
+        return;
+
     const gb_mapper_vt *vt = mapper->vt;
     assert(vt->free != NULL);
     vt->free(mapper);
+
+    // The implementation should have set these to NULL.
+    assert(mapper->impl == NULL);
+    assert(mapper->vt == NULL);
 }
 
 #endif //BRICKBOY_MAPPER_H

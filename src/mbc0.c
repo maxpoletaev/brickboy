@@ -24,6 +24,7 @@ gb_mbc0_init(gb_mapper_t *mapper, gb_rom_t *rom)
 
     impl->rom = rom;
     mapper->impl = impl;
+    mapper->vt = &gb_mbc0_vtable;
 
     return GB_OK;
 }
@@ -39,7 +40,7 @@ gb_mbc0_free(gb_mapper_t *mapper)
 void
 gb_mbc0_reset(gb_mapper_t *mapper)
 {
-    // does nothing, as mbc0 has no state
+    GB_UNUSED(mapper);
 }
 
 uint8_t
@@ -48,8 +49,8 @@ gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
     GB_MAPPER_IMPL(gb_mbc0_t);
 
     if (addr >= impl->rom->size) {
-        GB_TRACE("invalid address 0x%04X", addr);
-        return 0;
+        GB_TRACE("invalid address: 0x%04X", addr);
+        abort();
     }
 
     return impl->rom->data[addr];
@@ -58,5 +59,7 @@ gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
 void
 gb_mbc0_write(gb_mapper_t *mapper, uint16_t addr, uint8_t data)
 {
+    GB_UNUSED(data);
+    GB_UNUSED(mapper);
     GB_TRACE("unhandled write 0x%04X\n", addr);
 }
