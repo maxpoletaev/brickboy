@@ -8,8 +8,7 @@
 
 extern const gb_mapper_vt gb_mbc0_vtable;
 
-static const
-gb_mapper_vt *gb_mappers[0xFF] = {
+static const gb_mapper_vt *gb_mappers[256] = {
     [0x00] = &gb_mbc0_vtable,
 };
 

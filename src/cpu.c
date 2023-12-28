@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "common.h"
 #include "cpu.h"
@@ -154,6 +155,22 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
     }
 }
 
+static bool
+gb_is_arg_8bit(gb_operand_t arg)
+{
+    switch (arg) {
+    case ARG_REG_BC:
+    case ARG_REG_DE:
+    case ARG_REG_HL:
+    case ARG_REG_SP:
+    case ARG_REG_AF:
+    case ARG_IMM16:
+        return false;
+    default:
+        return true;
+    }
+}
+
 /* NOP
  * Flags: - - - -
  * No operation. */
@@ -171,6 +188,8 @@ gb_nop(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 static void
 gb_ld_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 {
+    assert(gb_is_arg_8bit(op->target));
+
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->source);
     gb_cpu_set(cpu, bus, op->target, v);
 }
@@ -181,6 +200,8 @@ gb_ld_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 static void
 gb_ld_u16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 {
+    assert(!gb_is_arg_8bit(op->target));
+
     uint16_t v = gb_cpu_get(cpu, bus, op->source);
     gb_cpu_set(cpu, bus, op->target, v);
 }
@@ -191,6 +212,8 @@ gb_ld_u16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 static void
 gb_inc_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 {
+    assert(gb_is_arg_8bit(op->target));
+
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->target);
     uint8_t r = v + 1;
 
@@ -207,6 +230,8 @@ gb_inc_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 static void
 gb_inc_u16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 {
+    assert(!gb_is_arg_8bit(op->target));
+
     uint16_t v = gb_cpu_get(cpu, bus, op->target);
     uint16_t r = v + 1;
 
@@ -219,7 +244,8 @@ gb_inc_u16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 static void
 gb_add_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 {
-    assert(op->target == ARG_REG_A); // always add to A
+    assert(op->target == ARG_REG_A);
+    assert(gb_is_arg_8bit(op->source));
 
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->source);
     uint8_t a = cpu->a;
@@ -229,6 +255,71 @@ gb_add_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
     cpu->flags.subtract = 0;
     cpu->flags.half_carry = (r&0xF) < (v&0xF);
     cpu->flags.carry = r < v;
+
+    cpu->a = r;
+}
+
+/* ADC r8,r8
+ * Flags: Z 0 H C
+ * Add 8-bit register or memory location and carry flag to A. */
+static void
+gb_adc_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
+{
+    assert(op->target == ARG_REG_A);
+    assert(gb_is_arg_8bit(op->source));
+
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->source);
+    uint8_t c = cpu->flags.carry;
+    uint8_t a = cpu->a;
+    uint8_t r = a + v + c;
+
+    cpu->flags.zero = r == 0;
+    cpu->flags.subtract = 0;
+    cpu->flags.half_carry = (r&0xF) < (v&0xF);
+    cpu->flags.carry = r < v;
+
+    cpu->a = r;
+}
+
+/* SUB r8,r8
+ * Flags: Z 1 H C
+ * Subtract 8-bit register or memory location from A. */
+static void
+gb_sub_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
+{
+    assert(op->target == ARG_REG_A);
+    assert(gb_is_arg_8bit(op->source));
+
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->source);
+    uint8_t a = cpu->a;
+    uint8_t r = a - v;
+
+    cpu->flags.zero = r == 0;
+    cpu->flags.subtract = 1;
+    cpu->flags.half_carry = (r&0xF) > (a&0xF);
+    cpu->flags.carry = r > a;
+
+    cpu->a = r;
+}
+
+/* SBC r8,r8
+ * Flags: Z 1 H C
+ * Subtract 8-bit register or memory location and carry flag from A. */
+static void
+gb_sbc_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
+{
+    assert(op->target == ARG_REG_A);
+    assert(gb_is_arg_8bit(op->source));
+
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->source);
+    uint8_t c = cpu->flags.carry;
+    uint8_t a = cpu->a;
+    uint8_t r = a - v - c;
+
+    cpu->flags.zero = r == 0;
+    cpu->flags.subtract = 1;
+    cpu->flags.half_carry = (r&0xF) > (a&0xF);
+    cpu->flags.carry = r > a;
 
     cpu->a = r;
 }
@@ -325,6 +416,19 @@ gb_opcode_t gb_opcodes[256] = {
     GB_OPCODE(0x7D, ARG_REG_A, ARG_REG_L, gb_ld_u8, "LD", 1),   // LD A,L
     GB_OPCODE(0x7E, ARG_REG_A, ARG_IND_HL, gb_ld_u8, "LD", 2),  // LD A,(HL)
     GB_OPCODE(0x7F, ARG_REG_A, ARG_REG_A, gb_ld_u8, "LD", 1),   // LD A,A
+    GB_OPCODE(0xE0, ARG_IND8, ARG_REG_A, gb_ld_u8, "LD", 3),    // LD (a8),A
+    GB_OPCODE(0xF0, ARG_REG_A, ARG_IND8, gb_ld_u8, "LD", 3),    // LD A,(a8)
+    GB_OPCODE(0xEA, ARG_IND16, ARG_REG_A, gb_ld_u8, "LD", 4),  // LD (a16),A
+    GB_OPCODE(0xFA, ARG_REG_A, ARG_IND16, gb_ld_u8, "LD", 4),  // LD A,(a16)
+    GB_OPCODE(0x06, ARG_REG_B, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD B,d8
+    GB_OPCODE(0x0E, ARG_REG_C, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD C,d8
+    GB_OPCODE(0x16, ARG_REG_D, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD D,d8
+    GB_OPCODE(0x1E, ARG_REG_E, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD E,d8
+    GB_OPCODE(0x26, ARG_REG_H, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD H,d8
+    GB_OPCODE(0x2E, ARG_REG_L, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD L,d8
+    GB_OPCODE(0x36, ARG_IND_HL, ARG_IMM8, gb_ld_u8, "LD", 3),   // LD (HL),d8
+    GB_OPCODE(0x3E, ARG_REG_A, ARG_IMM8, gb_ld_u8, "LD", 2),    // LD A,d8
+
 
     GB_OPCODE(0x01, ARG_REG_BC, ARG_IMM16, gb_ld_u16, "LD", 3),  // LD BC,d16
     GB_OPCODE(0x11, ARG_REG_DE, ARG_IMM16, gb_ld_u16, "LD", 3),  // LD DE,d16
@@ -341,6 +445,37 @@ gb_opcode_t gb_opcodes[256] = {
     GB_OPCODE(0x85, ARG_REG_A, ARG_REG_L, gb_add_u8, "ADD", 1),  // ADD A,L
     GB_OPCODE(0x86, ARG_REG_A, ARG_IND_HL, gb_add_u8, "ADD", 2), // ADD A,(HL)
     GB_OPCODE(0x87, ARG_REG_A, ARG_REG_A, gb_add_u8, "ADD", 1),  // ADD A,A
+    GB_OPCODE(0xC6, ARG_REG_A, ARG_IMM8, gb_add_u8, "ADD", 2),   // ADD A,d8
+
+    GB_OPCODE(0x88, ARG_REG_A, ARG_REG_B, gb_adc_u8, "ADC", 1),  // ADC A,B
+    GB_OPCODE(0x89, ARG_REG_A, ARG_REG_C, gb_adc_u8, "ADC", 1),  // ADC A,C
+    GB_OPCODE(0x8A, ARG_REG_A, ARG_REG_D, gb_adc_u8, "ADC", 1),  // ADC A,D
+    GB_OPCODE(0x8B, ARG_REG_A, ARG_REG_E, gb_adc_u8, "ADC", 1),  // ADC A,E
+    GB_OPCODE(0x8C, ARG_REG_A, ARG_REG_H, gb_adc_u8, "ADC", 1),  // ADC A,H
+    GB_OPCODE(0x8D, ARG_REG_A, ARG_REG_L, gb_adc_u8, "ADC", 1),  // ADC A,L
+    GB_OPCODE(0x8E, ARG_REG_A, ARG_IND_HL, gb_adc_u8, "ADC", 2), // ADC A,(HL)
+    GB_OPCODE(0x8F, ARG_REG_A, ARG_REG_A, gb_adc_u8, "ADC", 1),  // ADC A,A
+    GB_OPCODE(0xCE, ARG_REG_A, ARG_IMM8, gb_adc_u8, "ADC", 2),   // ADC A,d8
+
+    GB_OPCODE(0x90, ARG_REG_A, ARG_REG_B, gb_sub_u8, "SUB", 1),  // SUB A,B
+    GB_OPCODE(0x91, ARG_REG_A, ARG_REG_C, gb_sub_u8, "SUB", 1),  // SUB A,C
+    GB_OPCODE(0x92, ARG_REG_A, ARG_REG_D, gb_sub_u8, "SUB", 1),  // SUB A,D
+    GB_OPCODE(0x93, ARG_REG_A, ARG_REG_E, gb_sub_u8, "SUB", 1),  // SUB A,E
+    GB_OPCODE(0x94, ARG_REG_A, ARG_REG_H, gb_sub_u8, "SUB", 1),  // SUB A,H
+    GB_OPCODE(0x95, ARG_REG_A, ARG_REG_L, gb_sub_u8, "SUB", 1),  // SUB A,L
+    GB_OPCODE(0x96, ARG_REG_A, ARG_IND_HL, gb_sub_u8, "SUB", 2), // SUB A,(HL)
+    GB_OPCODE(0x97, ARG_REG_A, ARG_REG_A, gb_sub_u8, "SUB", 1),  // SUB A,A
+    GB_OPCODE(0xD6, ARG_REG_A, ARG_IMM8, gb_sub_u8, "SUB", 2),   // SUB A,d8
+
+    GB_OPCODE(0x98, ARG_REG_A, ARG_REG_B, gb_sbc_u8, "SBC", 1),  // SBC A,B
+    GB_OPCODE(0x99, ARG_REG_A, ARG_REG_C, gb_sbc_u8, "SBC", 1),  // SBC A,C
+    GB_OPCODE(0x9A, ARG_REG_A, ARG_REG_D, gb_sbc_u8, "SBC", 1),  // SBC A,D
+    GB_OPCODE(0x9B, ARG_REG_A, ARG_REG_E, gb_sbc_u8, "SBC", 1),  // SBC A,E
+    GB_OPCODE(0x9C, ARG_REG_A, ARG_REG_H, gb_sbc_u8, "SBC", 1),  // SBC A,H
+    GB_OPCODE(0x9D, ARG_REG_A, ARG_REG_L, gb_sbc_u8, "SBC", 1),  // SBC A,L
+    GB_OPCODE(0x9E, ARG_REG_A, ARG_IND_HL, gb_sbc_u8, "SBC", 2), // SBC A,(HL)
+    GB_OPCODE(0x9F, ARG_REG_A, ARG_REG_A, gb_sbc_u8, "SBC", 1),  // SBC A,A
+    GB_OPCODE(0xDE, ARG_REG_A, ARG_IMM8, gb_sbc_u8, "SBC", 2),   // SBC A,d8
 };
 
 static const
