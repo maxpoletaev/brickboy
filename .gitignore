@@ -1,0 +1,13 @@
+# Compiled objects
+/brickboy
+
+# IDE and OS files
+.DS_Store
+.vscode
+.idea
+
+# Debug files
+*.dSYM
+
+# Roms
+/roms
