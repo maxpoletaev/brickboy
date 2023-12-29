@@ -28,7 +28,7 @@ typedef struct {
     uint32_t size;
 } gb_rom_t;
 
-int gb_rom_open(gb_rom_t *rom, char *filename);
+int gb_rom_open(gb_rom_t *rom, const char *filename);
 
 void gb_rom_free(gb_rom_t *rom);
 

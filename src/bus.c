@@ -28,6 +28,15 @@ gb_bus_read(gb_bus_t *bus, uint16_t addr)
     }
 }
 
+uint16_t
+gb_bus_read16(gb_bus_t *bus, uint16_t addr)
+{
+    uint16_t val = 0;
+    val |= (uint16_t) gb_bus_read(bus, addr + 0) << 0;
+    val |= (uint16_t) gb_bus_read(bus, addr + 1) << 8;
+    return val;
+}
+
 void
 gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
 {

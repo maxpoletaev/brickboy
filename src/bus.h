@@ -25,6 +25,8 @@ void gb_bus_reset(gb_bus_t *bus);
 
 uint8_t gb_bus_read(gb_bus_t *bus, uint16_t addr);
 
+uint16_t gb_bus_read16(gb_bus_t *bus, uint16_t addr);
+
 void gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data);
 
 void gb_bus_step(gb_bus_t *bus);

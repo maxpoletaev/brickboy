@@ -76,8 +76,7 @@ gb_cpu_get(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t src)
         value = gb_bus_read(bus, addr);
         break;
     default:
-        GB_TRACE("unhandled operand: %d", src);
-        GB_UNREACHABLE();
+        GB_PANIC("unhandled operand: %d", src);
     }
 
     return value;
@@ -150,8 +149,7 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
         gb_bus_write(bus, addr, value8);
         break;
     default:
-        GB_TRACE("unhandled operand: %d", target);
-        GB_UNREACHABLE();
+        GB_PANIC("unhandled operand: %d", target);
     }
 }
 
@@ -327,8 +325,7 @@ gb_sbc_u8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_opcode_t *op)
 #define GB_OPCODE(op, target, source, handler, mnemonic, cost) \
     [op] = {op, cost, target, source, handler, mnemonic}
 
-static const
-gb_opcode_t gb_opcodes[256] = {
+const gb_opcode_t gb_opcodes[256] = {
     GB_OPCODE(0x00, ARG_NONE, ARG_NONE, gb_nop, "NOP", 1), // NOP
 
     GB_OPCODE(0x03, ARG_REG_BC, ARG_NONE, gb_inc_u16, "INC", 2),  // INC BC
@@ -478,8 +475,7 @@ gb_opcode_t gb_opcodes[256] = {
     GB_OPCODE(0xDE, ARG_REG_A, ARG_IMM8, gb_sbc_u8, "SBC", 2),   // SBC A,d8
 };
 
-static const
-gb_opcode_t gb_cb_opcodes[256] = {
+const gb_opcode_t gb_cb_opcodes[256] = {
     GB_OPCODE(0x00, ARG_NONE, ARG_NONE, gb_nop, "NOP", 1), // NOP
 };
 

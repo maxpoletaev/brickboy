@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "mapper.h"
+#include "disasm.h"
 #include "bus.h"
 #include "cpu.h"
 #include "rom.h"
@@ -47,6 +48,7 @@ main(int argc, char **argv)
     gb_bus_reset(&bus);
 
     while (1) {
+        gb_disasm_step(&bus);
         gb_bus_step(&bus);
         sleep(1);
     }

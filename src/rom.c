@@ -8,11 +8,11 @@
 #include "rom.h"
 
 int
-gb_rom_open(gb_rom_t *rom, char *filename)
+gb_rom_open(gb_rom_t *rom, const char *filename)
 {
     FILE *file = NULL;
     uint8_t *data = NULL;
-    struct stat file_info;
+    struct stat file_info = {0};
     int ret = GB_OK;
 
     file = fopen(filename, "rb");

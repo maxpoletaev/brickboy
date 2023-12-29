@@ -19,9 +19,9 @@
 
 #define GB_UNUSED(x) (void)(x)
 
-#define GB_UNREACHABLE() \
+#define GB_PANIC(fmt, ...) \
     do { \
-        GB_TRACE("unreachable code"); \
+        fprintf(stderr, "panic: " fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__); \
         abort(); \
     } while (0)
 
