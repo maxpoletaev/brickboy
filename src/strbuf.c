@@ -1,60 +1,67 @@
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "common.h"
+#include "shared.h"
 #include "strbuf.h"
+
+static inline void
+gb_check_overflow(gb_strbuf_t *buf, size_t newpos)
+{
+    if (newpos+1 >= sizeof(buf->data)) // +1 for null terminator
+        GB_PANIC("buffer is too short: %zu>%zu", newpos+1, sizeof(buf->data));
+}
 
 void
 gb_strbuf_init(gb_strbuf_t *buf)
 {
     memset(buf, 0, sizeof(*buf));
-    buf->ptr = buf->data;
     buf->pos = 0;
 }
 
 void
-gb_strbuf_pad(gb_strbuf_t *buf, size_t size, char pad)
+gb_strbuf_pad(gb_strbuf_t *buf, size_t newpos, char pad)
 {
-    if (buf->pos < size) {
-        memset(buf->ptr, pad, size - buf->pos);
-        buf->ptr = buf->data + size;
-        buf->pos = size;
+    if (buf->pos < newpos) {
+        gb_check_overflow(buf, newpos);
+        memset(buf->data + buf->pos, pad, newpos - buf->pos);
+        buf->data[newpos+1] = '\0';
+        buf->pos = newpos;
     }
 }
 
 void
 gb_strbuf_add(gb_strbuf_t *buf, const char *str)
 {
-    size_t len = strlen(str) + 1;
-    if (buf->pos + len >= sizeof(buf->data))
-        GB_PANIC("buffer overflow");
+    size_t len = strlen(str);
+    size_t newpos = buf->pos + len;
 
-    memcpy(buf->ptr, str, len);
-    buf->ptr += len;
-    buf->pos += len;
+    gb_check_overflow(buf, newpos);
+    memcpy(buf->data + buf->pos, str, len + 1);
+
+    buf->pos = newpos;
 }
 
 void
 gb_strbuf_addf(gb_strbuf_t *buf, const char *fmt, ...)
 {
-    char *head = buf->ptr;
-    size_t size = sizeof(buf->data) - buf->pos;
+    int len = 0;
+    char *ptr = buf->data + buf->pos;
+    size_t left = sizeof(buf->data) - buf->pos;
 
     va_list args;
     va_start(args, fmt);
-    int written = vsnprintf(head, size, fmt, args);
+    len = vsnprintf(ptr, left, fmt, args);
     va_end(args);
 
-    if (written < 0)
+    if (len < 0)
         GB_PANIC("vsnprintf failed");
 
-    buf->pos += (size_t) written;
-    if (buf->pos >= sizeof(buf->data))
-        GB_PANIC("buffer overflow");
+    size_t newpos = buf->pos + (size_t) len;
+    gb_check_overflow(buf, newpos);
 
-    buf->ptr = buf->data + buf->pos;
+    buf->pos = newpos;
 }
 
 char *

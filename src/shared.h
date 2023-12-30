@@ -1,9 +1,9 @@
-#ifndef BRICKBOY_COMMON_H
-#define BRICKBOY_COMMON_H
+#ifndef BRICKBOY_SHARED_H
+#define BRICKBOY_SHARED_H
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 
 #define GB_OK 0
 
@@ -25,13 +25,6 @@
         abort(); \
     } while (0)
 
-static inline char *
-gb_cstring(char *data, size_t size)
-{
-    char *str = malloc(size + 1);
-    strncpy(str, data, size);
-    str[size] = '\0';
-    return str;
-}
+char *gb_cstring(char *data, size_t size);
 
-#endif //BRICKBOY_COMMON_H
+#endif //BRICKBOY_SHARED_H

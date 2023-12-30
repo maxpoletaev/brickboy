@@ -1,7 +1,6 @@
 #include <stdint.h>
-#include <stdio.h>
 
-#include "common.h"
+#include "shared.h"
 #include "mapper.h"
 #include "bus.h"
 #include "cpu.h"

@@ -1,0 +1,4 @@
+---
+Checks: 'clang-analyzer-*,misc-*,performance-*,portability-*,security-*,bugprone-*,-bugprone-easily-swappable-parameters,-misc-header-include-cycle'
+AnalyzeTemporaryDtors: false
+WarningsAsErrors: true

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "common.h"
+#include "shared.h"
 #include "rom.h"
 
 int
@@ -50,7 +50,6 @@ gb_rom_open(gb_rom_t *rom, const char *filename)
 
     // Header is mapped directly into the rom data at 0x0100.
     rom->header = (gb_romheader_t *) (data + 0x0100);
-
     rom->size = rom_size;
     rom->data = data;
 

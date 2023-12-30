@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "common.h"
+#include <stdint.h>
+
+#include "shared.h"
 #include "mapper.h"
+#include "rom.h"
 #include "mbc0.h"
 
 const
@@ -12,6 +15,12 @@ gb_mapper_vt gb_mbc0_vtable = {
     .reset = gb_mbc0_reset,
     .free = gb_mbc0_free,
 };
+
+static inline gb_mbc0_t *
+gb_mapper_impl(gb_mapper_t *mapper)
+{
+    return (gb_mbc0_t *) mapper->impl;
+}
 
 int
 gb_mbc0_init(gb_mapper_t *mapper, gb_rom_t *rom)
@@ -24,7 +33,6 @@ gb_mbc0_init(gb_mapper_t *mapper, gb_rom_t *rom)
 
     impl->rom = rom;
     mapper->impl = impl;
-    mapper->vt = &gb_mbc0_vtable;
 
     return GB_OK;
 }
@@ -34,7 +42,6 @@ gb_mbc0_free(gb_mapper_t *mapper)
 {
     free(mapper->impl);
     mapper->impl = NULL;
-    mapper->vt = NULL;
 }
 
 void
@@ -46,7 +53,7 @@ gb_mbc0_reset(gb_mapper_t *mapper)
 uint8_t
 gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
 {
-    GB_MAPPER_IMPL(gb_mbc0_t);
+    gb_mbc0_t *impl = gb_mapper_impl(mapper);
 
     if (addr >= impl->rom->size) {
         GB_TRACE("invalid address: 0x%04X", addr);

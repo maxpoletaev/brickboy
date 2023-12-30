@@ -1,9 +1,8 @@
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
-#include "common.h"
+#include "shared.h"
 #include "mapper.h"
 #include "disasm.h"
 #include "bus.h"
@@ -24,7 +23,8 @@ main(int argc, char **argv)
     }
 
     char *rom_filename = argv[1];
-    if (access(rom_filename, R_OK) != 0) {
+
+    if (access(rom_filename, R_OK) != 0) { // NOLINT(misc-include-cleaner): R_OK is defined in unistd.h
         GB_TRACE("file not found: %s", rom_filename);
         goto cleanup;
     }
@@ -34,23 +34,25 @@ main(int argc, char **argv)
         goto cleanup;
     }
 
-    char *title = gb_cstring(rom.header->title, sizeof(rom.header->title));
-    GB_LOG("rom loaded: %s (%d)", title, rom.header->cartridge_type);
-    free(title);
-
     if (gb_mapper_init(&mapper, &rom) != GB_OK) {
         GB_TRACE("failed to initialize mapper");
         goto cleanup;
     }
+
+    char *title = gb_cstring(rom.header->title, sizeof(rom.header->title));
+    GB_LOG("rom loaded: %s (%s)", title, mapper.name);
+    free(title);
 
     bus.cpu = &cpu;
     bus.mapper = &mapper;
     gb_bus_reset(&bus);
 
     while (1) {
-        gb_disasm_step(&bus);
+        if (cpu.halt == 0) {
+            gb_disasm_step(&bus, stdout);
+        }
+
         gb_bus_step(&bus);
-        sleep(1);
     }
 
     gb_mapper_free(&mapper);

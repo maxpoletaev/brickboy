@@ -91,8 +91,8 @@ typedef enum {
     ARG_IND_HLD, // (HL-)
 
     // indirect (immediate)
-    ARG_IND8,  // (a8)
-    ARG_IND16, // (a16)
+    ARG_IND_IMM8,  // (a8)
+    ARG_IND_IMM16, // (a16)
 } gb_operand_t;
 
 typedef struct gb_opcode_t gb_opcode_t;
@@ -108,8 +108,8 @@ typedef void (*cpu_handler_t)(
 struct gb_opcode_t {
     uint8_t opcode;
     uint8_t cycles;
-    gb_operand_t target;
-    gb_operand_t source;
+    gb_operand_t arg1;
+    gb_operand_t arg2;
     cpu_handler_t handler;
     const char *mnemonic;
 };
@@ -117,5 +117,9 @@ struct gb_opcode_t {
 void gb_cpu_reset(gb_cpu_t *cpu);
 
 void gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus);
+
+const gb_opcode_t gb_opcodes[256];
+
+const gb_opcode_t gb_cb_opcodes[256];
 
 #endif //BRICKBOY_CPU_H

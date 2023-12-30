@@ -2,6 +2,15 @@
 
 WIP Gameboy Emulator
 
+## Building
+
+You will need `cmake`, `make` and a C compiler (GCC or Clang).
+
+```bash
+cmake .
+make
+```
+
 ## Resources
 
 - [Pan Docs](https://gbdev.io/pandocs/)
