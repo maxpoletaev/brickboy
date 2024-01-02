@@ -1,4 +1,4 @@
 ---
-Checks: 'clang-analyzer-*,misc-*,performance-*,portability-*,security-*,bugprone-*,-bugprone-easily-swappable-parameters,-misc-header-include-cycle'
+Checks: 'clang-analyzer-*,misc-*,performance-*,portability-*,security-*,bugprone-*,-bugprone-easily-swappable-parameters'
 AnalyzeTemporaryDtors: false
 WarningsAsErrors: true

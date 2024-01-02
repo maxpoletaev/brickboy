@@ -9,13 +9,9 @@
 
 #define GB_ERR 1
 
-#define GB_COLOR_RED "\x1b[31m"
-
-#define GB_COLOR_RESET "\x1b[0m"
-
 #define GB_LOG(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
 
-#define GB_TRACE(fmt, ...) fprintf(stderr, GB_COLOR_RED "(%s:%d): " fmt GB_COLOR_RESET "\n", __func__, __LINE__, ##__VA_ARGS__); \
+#define GB_TRACE(fmt, ...) fprintf(stderr, "(%s:%d): " fmt "\n", __func__, __LINE__, ##__VA_ARGS__); \
 
 #define GB_UNUSED(x) (void)(x)
 

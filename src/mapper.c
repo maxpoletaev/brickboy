@@ -5,8 +5,7 @@
 #include "shared.h"
 #include "mapper.h"
 #include "rom.h"
-
-extern const gb_mapper_vt gb_mbc0_vtable;
+#include "mbc0.h"
 
 static const gb_mapper_vt *gb_mappers[256] = {
     [0x00] = &gb_mbc0_vtable,
