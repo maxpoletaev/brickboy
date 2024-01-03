@@ -5,12 +5,15 @@
 
 #include "bus.h"
 
+// 1010 0000
+// 1000 0000
+
 typedef struct {
-    uint8_t zero : 1;
-    uint8_t subtract : 1;
-    uint8_t half_carry : 1;
-    uint8_t carry : 1;
     uint8_t unused : 4;
+    uint8_t carry : 1;
+    uint8_t half_carry : 1;
+    uint8_t subtract : 1;
+    uint8_t zero : 1;
 } gb_cpu_flags_t;
 
 typedef struct gb_cpu_t {
@@ -30,8 +33,8 @@ typedef struct gb_cpu_t {
     union {
         uint16_t bc;
         struct {
-            uint8_t b;
             uint8_t c;
+            uint8_t b;
         };
     };
 
@@ -48,8 +51,8 @@ typedef struct gb_cpu_t {
     union {
         uint16_t hl;
         struct {
-            uint8_t h;
             uint8_t l;
+            uint8_t h;
         };
     };
 
@@ -122,6 +125,50 @@ typedef enum {
     ARG_RST_7, // $38
 } gb_operand_t;
 
+static const char *gb_operand_names[] = {
+    [ARG_NONE] = "NONE",
+    [ARG_IMM8] = "IMM8",
+    [ARG_IMM16] = "IMM16",
+    [ARG_REG_A] = "REG_A",
+    [ARG_REG_B] = "REG_B",
+    [ARG_REG_C] = "REG_C",
+    [ARG_REG_D] = "REG_D",
+    [ARG_REG_E] = "REG_E",
+    [ARG_REG_H] = "REG_H",
+    [ARG_REG_L] = "REG_L",
+    [ARG_REG_AF] = "REG_AF",
+    [ARG_REG_BC] = "REG_BC",
+    [ARG_REG_DE] = "REG_DE",
+    [ARG_REG_HL] = "REG_HL",
+    [ARG_REG_SP] = "REG_SP",
+    [ARG_IND_C] = "IND_C",
+    [ARG_IND_BC] = "IND_BC",
+    [ARG_IND_DE] = "IND_DE",
+    [ARG_IND_HL] = "IND_HL",
+    [ARG_IND_HLI] = "IND_HLI",
+    [ARG_IND_HLD] = "IND_HLD",
+    [ARG_IND_IMM8] = "IND_IMM8",
+    [ARG_IND_IMM16] = "IND_IMM16",
+    [ARG_FLAG_ZERO] = "FLAG_ZERO",
+    [ARG_FLAG_CARRY] = "FLAG_CARRY",
+    [ARG_BIT_0] = "BIT_0",
+    [ARG_BIT_1] = "BIT_1",
+    [ARG_BIT_2] = "BIT_2",
+    [ARG_BIT_3] = "BIT_3",
+    [ARG_BIT_4] = "BIT_4",
+    [ARG_BIT_5] = "BIT_5",
+    [ARG_BIT_6] = "BIT_6",
+    [ARG_BIT_7] = "BIT_7",
+    [ARG_RST_0] = "RST_0",
+    [ARG_RST_1] = "RST_1",
+    [ARG_RST_2] = "RST_2",
+    [ARG_RST_3] = "RST_3",
+    [ARG_RST_4] = "RST_4",
+    [ARG_RST_5] = "RST_5",
+    [ARG_RST_6] = "RST_6",
+    [ARG_RST_7] = "RST_7",
+};
+
 typedef struct gb_instr_t gb_instr_t;
 
 typedef struct gb_bus_t gb_bus_t;
@@ -144,6 +191,8 @@ struct gb_instr_t {
 void gb_cpu_reset(gb_cpu_t *cpu);
 
 void gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus);
+
+const gb_instr_t *gb_cpu_decode(gb_bus_t *bus, uint16_t pc);
 
 const gb_instr_t gb_opcodes[256];
 

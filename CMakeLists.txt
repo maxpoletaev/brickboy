@@ -13,4 +13,4 @@ set(CMAKE_C_CLANG_TIDY "clang-tidy")
 
 file(GLOB sources src/*.c src/*.h)
 add_executable(brickboy ${sources})
-add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror)
+add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Werror -fsanitize=address)

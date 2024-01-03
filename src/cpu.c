@@ -9,23 +9,32 @@
 #include "bus.h"
 
 static const uint16_t gb_reset_addr[8] = {
-    0x0000, 0x0008, 0x0010, 0x0018,
-    0x0020, 0x0028, 0x0030, 0x0038,
+    0x00, 0x08, 0x10, 0x18,
+    0x20, 0x28, 0x30, 0x38,
 };
+
+static const char *
+gb_operand_name(gb_operand_t arg)
+{
+    if (arg >= GB_ARRAY_SIZE(gb_operand_names))
+        return "???";
+
+    return gb_operand_names[arg];
+}
 
 void
 gb_cpu_reset(gb_cpu_t *cpu)
 {
-    cpu->af = 0;
-    cpu->bc = 0;
-    cpu->de = 0;
-    cpu->hl = 0;
-    cpu->stall = 0;
-    cpu->cycle = 0;
+    cpu->af = 0x01B0;
+    cpu->bc = 0x0013;
+    cpu->de = 0x00D8;
+    cpu->hl = 0x014D;
     cpu->sp = 0xFFFE;
     cpu->pc = 0x0100; // skip the boot rom for now
-    cpu->ime = 1;
     cpu->ime_delay = -1;
+    cpu->ime = 1;
+    cpu->stall = 0;
+    cpu->cycle = 0;
 }
 
 static uint16_t
@@ -36,7 +45,8 @@ gb_cpu_get(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t src)
 
     switch (src) {
     case ARG_NONE:
-        GB_PANIC("invalid source operand: %d", src);
+        GB_BOUNDS_CHECK(gb_operand_names, src);
+        GB_PANIC("invalid source operand: %s", gb_operand_names[src]);
     case ARG_BIT_0:
     case ARG_BIT_1:
     case ARG_BIT_2:
@@ -167,7 +177,8 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
     case ARG_RST_7:
     case ARG_FLAG_ZERO:
     case ARG_FLAG_CARRY:
-        GB_PANIC("invalid target operand: %d", target);
+        GB_BOUNDS_CHECK(gb_operand_names, target);
+        GB_PANIC("invalid target operand: %s", gb_operand_names[target]);
     case ARG_REG_A:
         cpu->a = value8;
         break;
@@ -200,6 +211,7 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
         break;
     case ARG_REG_HL:
         cpu->hl = value16;
+        break;
     case ARG_REG_SP:
         cpu->sp = value16;
         break;
@@ -223,7 +235,7 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
         gb_bus_write(bus, cpu->hl--, value8);
         break;
     case ARG_IND_IMM8:
-        addr = gb_bus_read(bus, cpu->pc++);
+        addr = 0xFF00 + gb_bus_read(bus, cpu->pc++);
         gb_bus_write(bus, addr, value8);
         break;
     case ARG_IND_IMM16:
@@ -269,6 +281,21 @@ gb_cpu_pop(gb_cpu_t *cpu, gb_bus_t *bus)
     return value;
 }
 
+const gb_instr_t *
+gb_cpu_decode(gb_bus_t *bus, uint16_t pc)
+{
+    uint8_t opcode = gb_bus_read(bus, pc);
+    const gb_instr_t *op = &gb_opcodes[opcode];
+
+    // Prefixed instructions
+    if (opcode == 0xCB) {
+        opcode = gb_bus_read(bus, pc + 1);
+        op = &gb_cb_opcodes[opcode];
+    }
+
+    return op;
+}
+
 void
 gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus)
 {
@@ -288,10 +315,8 @@ gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus)
         op = &gb_cb_opcodes[opcode];
     }
 
-    if (op->handler == NULL) {
-        GB_TRACE("invalid opcode 0x%02X", opcode);
-        abort();
-    }
+    if (op->handler == NULL)
+        GB_PANIC("invalid opcode 0x%02X", opcode);
 
     cpu->stall = op->cycles - 1;
     op->handler(cpu, bus, op);
@@ -386,7 +411,7 @@ gb_dec8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
  * Flags: Z 0 H C
  * Add 8-bit register or memory location to A. */
 static void
-gb_add8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+gb_add_a(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -398,6 +423,23 @@ gb_add8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     cpu->flags.carry = r < v;
 
     cpu->a = r;
+}
+
+/* Add HL,r16
+ * Flags: - 0 H C
+ * Add 16-bit register to HL. */
+static void
+gb_add_hl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    uint16_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint16_t hl = cpu->hl;
+    uint16_t r = hl + v;
+
+    cpu->flags.subtract = 0;
+    cpu->flags.half_carry = (r&0xFFF) < (hl&0xFFF);
+    cpu->flags.carry = r < hl;
+
+    cpu->hl = r;
 }
 
 /* ADD SP,s8
@@ -412,7 +454,7 @@ gb_add_sp(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 
     cpu->flags.zero = 0;
     cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xFF) < (sp&0xFF);
+    cpu->flags.half_carry = (r&0xF) < (sp&0xF);
     cpu->flags.carry = r < sp;
 
     cpu->sp = r;
@@ -526,6 +568,16 @@ gb_jp16_ifn(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     }
 }
 
+/* JR s8
+ * Flags: - - - -
+ * Jump to 8-bit signed offset. */
+static void
+gb_jr8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    int8_t offset = (int8_t) gb_cpu_get(cpu, bus, op->arg1);
+    cpu->pc += offset;
+}
+
 /* JR F,s8
  * Flags: - - - -
  * Jump to 8-bit signed offset if F flag is set. */
@@ -612,7 +664,7 @@ gb_cp8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
  * Flags: - - - -
  * Push 16-bit register onto stack. */
 static void
-gb_push(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+gb_push16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint16_t v = gb_cpu_get(cpu, bus, op->arg1);
     gb_cpu_push(cpu, bus, v);
@@ -622,7 +674,7 @@ gb_push(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
  * Flags: - - - -
  * Pop 16-bit register off stack. */
 static void
-gb_pop(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+gb_pop16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint16_t v = gb_cpu_pop(cpu, bus);
     gb_cpu_set(cpu, bus, op->arg1, v);
@@ -738,7 +790,7 @@ gb_rst(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 
 /* RLCA
  * RLC r8
- * Flags: 0 0 0 C
+ * Flags: Z 0 0 C
  * Rotate register left. */
 static void
 gb_rlc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
@@ -746,7 +798,7 @@ gb_rlc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = (v << 1) | (v >> 7);
 
-    cpu->flags.zero = 0;
+    cpu->flags.zero = r == 0;
     cpu->flags.subtract = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = (v >> 7) & 1;
@@ -755,11 +807,10 @@ gb_rlc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 }
 
 /* RLA
- * RL r8
  * Flags: 0 0 0 C
- * Rotate register left through carry flag. */
+ * Rotate register A left through carry flag. */
 static void
-gb_rl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+gb_rla(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = (v << 1) | cpu->flags.carry;
@@ -772,13 +823,28 @@ gb_rl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     gb_cpu_set(cpu, bus, op->arg1, r);
 }
 
+/* RL r8
+ * Flags: Z 0 0 C
+ * Rotate register left through carry flag. */
+static void
+gb_rl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (v << 1) | cpu->flags.carry;
+
+    cpu->flags.zero = r == 0;
+    cpu->flags.subtract = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = (v >> 7) & 1;
+
+    gb_cpu_set(cpu, bus, op->arg1, r);
+}
 
 /* RRCA
- * RRC r8
  * Flags: 0 0 0 C
  * Rotate register right. */
 static void
-gb_rrc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+gb_rrca(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = (v >> 1) | (v << 7);
@@ -791,9 +857,43 @@ gb_rrc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     gb_cpu_set(cpu, bus, op->arg1, r);
 }
 
+/* RRC r8
+ * Flags: Z 0 0 C
+ * Rotate register right. */
+static void
+gb_rrc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (v >> 1) | (v << 7);
+
+    cpu->flags.zero = r == 0;
+    cpu->flags.subtract = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = v & 1;
+
+    gb_cpu_set(cpu, bus, op->arg1, r);
+}
+
 /* RRA
- * RR r8
  * Flags: 0 0 0 C
+ * Rotate register A right through carry flag. */
+static void
+gb_rra(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (v >> 1) | (cpu->flags.carry << 7);
+
+    cpu->flags.zero = 0;
+    cpu->flags.subtract = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = v & 1;
+
+    gb_cpu_set(cpu, bus, op->arg1, r);
+}
+
+
+/* RR r8
+ * Flags: Z 0 0 C
  * Rotate register right through carry flag. */
 static void
 gb_rr(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
@@ -801,7 +901,7 @@ gb_rr(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = (v >> 1) | (cpu->flags.carry << 7);
 
-    cpu->flags.zero = 0;
+    cpu->flags.zero = r == 0;
     cpu->flags.subtract = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
@@ -884,6 +984,9 @@ gb_ei(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     cpu->ime_delay = 1;
 }
 
+/* SWAP n
+ * Flags: Z 0 0 0
+ * Swap upper and lower nibbles of register. */
 static void
 gb_swap(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
@@ -904,8 +1007,8 @@ gb_swap(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_bit(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg2);
-    uint8_t v = gb_cpu_getbit(cpu, bus, op->arg1, bit);
+    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t v = gb_cpu_getbit(cpu, bus, op->arg2, bit);
 
     cpu->flags.zero = v == 0;
     cpu->flags.subtract = 0;
@@ -918,8 +1021,8 @@ gb_bit(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_set(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg2);
-    gb_cpu_setbit(cpu, bus, op->arg1, bit, 1);
+    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    gb_cpu_setbit(cpu, bus, op->arg2, bit, 1);
 }
 
 /* RES b,r8
@@ -928,8 +1031,8 @@ gb_set(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_res(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg2);
-    gb_cpu_setbit(cpu, bus, op->arg1, bit, 0);
+    uint8_t bit = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    gb_cpu_setbit(cpu, bus, op->arg2, bit, 0);
 }
 
 /* ----------------------------------------------------------------------------
@@ -1060,16 +1163,21 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0x08, ARG_IND_IMM16, ARG_REG_SP, gb_ld16, 5, "LD ($%04X),SP"),
     gb_op(0xF9, ARG_REG_SP, ARG_REG_HL, gb_ld16, 2, "LD SP,HL"),
 
-    gb_op(0x80, ARG_REG_B, ARG_NONE, gb_add8, 1, "ADD A,B"),
-    gb_op(0x81, ARG_REG_C, ARG_NONE, gb_add8, 1, "ADD A,C"),
-    gb_op(0x82, ARG_REG_D, ARG_NONE, gb_add8, 1, "ADD A,D"),
-    gb_op(0x83, ARG_REG_E, ARG_NONE, gb_add8, 1, "ADD A,E"),
-    gb_op(0x84, ARG_REG_H, ARG_NONE, gb_add8, 1, "ADD A,H"),
-    gb_op(0x85, ARG_REG_L, ARG_NONE, gb_add8, 1, "ADD A,L"),
-    gb_op(0x86, ARG_IND_HL, ARG_NONE, gb_add8, 2, "ADD A,(HL)"),
-    gb_op(0x87, ARG_REG_A, ARG_NONE, gb_add8, 1, "ADD A,A"),
-    gb_op(0xC6, ARG_IMM8, ARG_NONE, gb_add8, 2, "ADD A,$%02X"),
+    gb_op(0x80, ARG_REG_B, ARG_NONE, gb_add_a, 1, "ADD A,B"),
+    gb_op(0x81, ARG_REG_C, ARG_NONE, gb_add_a, 1, "ADD A,C"),
+    gb_op(0x82, ARG_REG_D, ARG_NONE, gb_add_a, 1, "ADD A,D"),
+    gb_op(0x83, ARG_REG_E, ARG_NONE, gb_add_a, 1, "ADD A,E"),
+    gb_op(0x84, ARG_REG_H, ARG_NONE, gb_add_a, 1, "ADD A,H"),
+    gb_op(0x85, ARG_REG_L, ARG_NONE, gb_add_a, 1, "ADD A,L"),
+    gb_op(0x86, ARG_IND_HL, ARG_NONE, gb_add_a, 2, "ADD A,(HL)"),
+    gb_op(0x87, ARG_REG_A, ARG_NONE, gb_add_a, 1, "ADD A,A"),
+    gb_op(0xC6, ARG_IMM8, ARG_NONE, gb_add_a, 2, "ADD A,$%02X"),
+
     gb_op(0xE8, ARG_IMM8, ARG_NONE, gb_add_sp, 4, "ADD SP,$%02X"),
+    gb_op(0x09, ARG_REG_BC, ARG_NONE, gb_add_hl, 2, "ADD HL,BC"),
+    gb_op(0x19, ARG_REG_DE, ARG_NONE, gb_add_hl, 2, "ADD HL,DE"),
+    gb_op(0x29, ARG_REG_HL, ARG_NONE, gb_add_hl, 2, "ADD HL,HL"),
+    gb_op(0x39, ARG_REG_SP, ARG_NONE, gb_add_hl, 2, "ADD HL,SP"),
 
     gb_op(0x88, ARG_REG_B, ARG_NONE, gb_adc8, 1, "ADC A,B"),
     gb_op(0x89, ARG_REG_C, ARG_NONE, gb_adc8, 1, "ADC A,C"),
@@ -1108,6 +1216,8 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0xA4, ARG_REG_H, ARG_NONE, gb_and8, 1, "AND H"),
     gb_op(0xA5, ARG_REG_L, ARG_NONE, gb_and8, 1, "AND L"),
     gb_op(0xA6, ARG_IND_HL, ARG_NONE, gb_and8, 2, "AND (HL)"),
+    gb_op(0xA7, ARG_REG_A, ARG_NONE, gb_and8, 1, "AND A"),
+    gb_op(0xE6, ARG_IMM8, ARG_NONE, gb_and8, 2, "AND $%02X"),
 
     gb_op(0xA8, ARG_REG_B, ARG_NONE, gb_xor8, 1, "XOR B"),
     gb_op(0xA9, ARG_REG_C, ARG_NONE, gb_xor8, 1, "XOR C"),
@@ -1117,6 +1227,7 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0xAD, ARG_REG_L, ARG_NONE, gb_xor8, 1, "XOR L"),
     gb_op(0xAE, ARG_IND_HL, ARG_NONE, gb_xor8, 2, "XOR (HL)"),
     gb_op(0xAF, ARG_REG_A, ARG_NONE, gb_xor8, 1, "XOR A"),
+    gb_op(0xEE, ARG_IMM8, ARG_NONE, gb_xor8, 2, "XOR $%02X"),
 
     gb_op(0xB0, ARG_REG_B, ARG_NONE, gb_or8, 1, "OR B"),
     gb_op(0xB1, ARG_REG_C, ARG_NONE, gb_or8, 1, "OR C"),
@@ -1126,6 +1237,7 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0xB5, ARG_REG_L, ARG_NONE, gb_or8, 1, "OR L"),
     gb_op(0xB6, ARG_IND_HL, ARG_NONE, gb_or8, 2, "OR (HL)"),
     gb_op(0xB7, ARG_REG_A, ARG_NONE, gb_or8, 1, "OR A"),
+    gb_op(0xF6, ARG_IMM8, ARG_NONE, gb_or8, 2, "OR $%02X"),
 
     gb_op(0xB8, ARG_REG_B, ARG_NONE, gb_cp8, 1, "CP B"),
     gb_op(0xB9, ARG_REG_C, ARG_NONE, gb_cp8, 1, "CP C"),
@@ -1137,6 +1249,17 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0xBF, ARG_REG_A, ARG_NONE, gb_cp8, 1, "CP A"),
     gb_op(0xFE, ARG_IMM8, ARG_NONE, gb_cp8, 2, "CP $%02X"),
 
+    gb_op(0xC1, ARG_REG_BC, ARG_NONE, gb_pop16, 3, "POP BC"),
+    gb_op(0xD1, ARG_REG_DE, ARG_NONE, gb_pop16, 3, "POP DE"),
+    gb_op(0xE1, ARG_REG_HL, ARG_NONE, gb_pop16, 3, "POP HL"),
+    gb_op(0xF1, ARG_REG_AF, ARG_NONE, gb_pop16, 3, "POP AF"),
+
+    gb_op(0xC5, ARG_REG_BC, ARG_NONE, gb_push16, 4, "PUSH BC"),
+    gb_op(0xD5, ARG_REG_DE, ARG_NONE, gb_push16, 4, "PUSH DE"),
+    gb_op(0xE5, ARG_REG_HL, ARG_NONE, gb_push16, 4, "PUSH HL"),
+    gb_op(0xF5, ARG_REG_AF, ARG_NONE, gb_push16, 4, "PUSH AF"),
+
+    gb_op(0x18, ARG_IMM8, ARG_NONE, gb_jr8, 2, "JR $%02X"),
     gb_op(0x28, ARG_FLAG_ZERO, ARG_IMM8, gb_jr8_if, 2, "JR Z,$%02X"),
     gb_op(0x38, ARG_FLAG_CARRY, ARG_IMM8, gb_jr8_if, 2, "JR C,$%02X"),
     gb_op(0x20, ARG_FLAG_ZERO, ARG_IMM8, gb_jr8_ifn, 2, "JR NZ,$%02X"),
@@ -1172,9 +1295,9 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0xFF, ARG_RST_7, ARG_NONE, gb_rst, 4, "RST 7"),
 
     gb_op(0x07, ARG_REG_A, ARG_NONE, gb_rlc, 1, "RLCA"),
-    gb_op(0x17, ARG_REG_A, ARG_NONE, gb_rl, 1, "RLA"),
-    gb_op(0x0F, ARG_REG_A, ARG_NONE, gb_rrc, 1, "RRCA"),
-    gb_op(0x1F, ARG_REG_A, ARG_NONE, gb_rr, 1, "RRA"),
+    gb_op(0x17, ARG_REG_A, ARG_NONE, gb_rla, 1, "RLA"),
+    gb_op(0x0F, ARG_REG_A, ARG_NONE, gb_rrca, 1, "RRCA"),
+    gb_op(0x1F, ARG_REG_A, ARG_NONE, gb_rra, 1, "RRA"),
 };
 
 const gb_instr_t gb_cb_opcodes[256] = {

@@ -9,10 +9,12 @@
 
 static const gb_mapper_vt *gb_mappers[256] = {
     [0x00] = &gb_mbc0_vtable,
+    [0x01] = &gb_mbc0_vtable,
 };
 
 static const char *gb_mapper_names[256] = {
-    [0x00] = "MBC0",
+    [0x00] = "ROM ONLY",
+    [0x01] = "ROM+MBC1",
 };
 
 int
@@ -27,6 +29,7 @@ gb_mapper_init(gb_mapper_t *mapper, gb_rom_t *rom)
         return GB_ERR;
     }
 
+    mapper->impl = NULL;
     assert(vt->init != NULL);
     int ret = vt->init(mapper, rom);
 

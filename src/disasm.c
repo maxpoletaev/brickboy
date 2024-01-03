@@ -68,7 +68,7 @@ gb_arg_indirect(gb_strbuf_t *str, gb_operand_t arg, gb_bus_t *bus, gb_cpu_t *cpu
         gb_strbuf_addf(str, " @ (HL)=%02X", val);
         break;
     case ARG_IND_IMM8:
-        addr = gb_arg_value(arg, bus, pc+1);
+        addr = 0xFF00 + gb_arg_value(arg, bus, pc+1);
         val = gb_bus_read(bus, addr);
         gb_strbuf_addf(str, " @ ($%02X)=%02X", addr, val);
         break;
@@ -180,9 +180,9 @@ gb_disasm_step(gb_bus_t *bus, gb_cpu_t *cpu, FILE *out)
                    (cpu->flags.carry ? 'C' : '-'));
     gb_strbuf_pad(buf, 68, ' ');
 
-    // CPU registers: AF:0000 BC:0000 ...
-    gb_strbuf_addf(buf, "AF:%04X BC:%04X DE:%04X HL:%04X SP:%04X CYC:%llu",
-                   cpu->af, cpu->bc, cpu->de, cpu->hl, cpu->sp, cpu->cycle);
+    // CPU registers: A:00 B:00 C:00 D:00 E:00 H:00 L:00 SP:0000
+    gb_strbuf_addf(buf, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
+                   cpu->a, cpu->f, cpu->b, cpu->c, cpu->d, cpu->e, cpu->h, cpu->l, cpu->sp);
 
     fprintf(out, "%s\n", str);
 }

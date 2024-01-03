@@ -54,9 +54,8 @@ gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
 {
     gb_mbc0_t *impl = gb_impl(mapper);
 
-    if (addr >= impl->rom->size) {
+    if (addr >= impl->rom->size)
         GB_PANIC("out of bounds read at 0x%04X", addr);
-    }
 
     return impl->rom->data[addr];
 }
@@ -64,7 +63,10 @@ gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
 void
 gb_mbc0_write(gb_mapper_t *mapper, uint16_t addr, uint8_t data)
 {
-    GB_UNUSED(data);
-    GB_UNUSED(mapper);
-    GB_TRACE("unhandled write at 0x%04X", addr);
+    gb_mbc0_t *impl = gb_impl(mapper);
+
+    if (addr >= impl->rom->size)
+        GB_PANIC("out of bounds write at 0x%04X", addr);
+
+    impl->rom->data[addr] = data;
 }
