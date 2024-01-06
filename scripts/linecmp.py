@@ -11,6 +11,7 @@ class Args:
     log1: str
     log2: str
     prev: int
+    lineno: bool
 
 
 def find_position(line1: str, line2: str) -> str:
@@ -61,9 +62,15 @@ def compare(args: Args) -> bool:
             print(line2)
             print(find_position(line1, line2))
 
+            if args.lineno:
+                print(lineno+skip2)
+
             return False
 
         prev_lines.append(line1)
+
+    if args.lineno:
+        print(0)
 
     return True
 
@@ -73,6 +80,7 @@ def main():
     parser.add_argument('log1', help='filename:skip')
     parser.add_argument('log2', help='filename:skip')
     parser.add_argument('--prev', '-p', type=int, default=5, help='number of previous lines to show')
+    parser.add_argument('--lineno', '-n', action='store_true', help='output line number at the end of the script')
     args = parser.parse_args()
 
     if not compare(args):

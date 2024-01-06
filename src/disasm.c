@@ -175,7 +175,7 @@ gb_disasm_step(gb_bus_t *bus, gb_cpu_t *cpu, FILE *out)
     // CPU flags: [Z N - C]
     gb_strbuf_addf(buf, "[%c %c %c %c]",
                    (cpu->flags.zero ? 'Z' : '-'),
-                   (cpu->flags.subtract ? 'N' : '-'),
+                   (cpu->flags.negative ? 'N' : '-'),
                    (cpu->flags.half_carry ? 'H' : '-'),
                    (cpu->flags.carry ? 'C' : '-'));
     gb_strbuf_pad(buf, 68, ' ');

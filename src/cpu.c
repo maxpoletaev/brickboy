@@ -13,14 +13,53 @@ static const uint16_t gb_reset_addr[8] = {
     0x20, 0x28, 0x30, 0x38,
 };
 
-static const char *
-gb_operand_name(gb_operand_t arg)
-{
-    if (arg >= GB_ARRAY_SIZE(gb_operand_names))
-        return "???";
+const char *gb_operand_names[] = {
+    [ARG_NONE] = "NONE",
 
-    return gb_operand_names[arg];
-}
+    [ARG_IMM8] = "IMM8",
+    [ARG_IMM16] = "IMM16",
+    [ARG_REG_A] = "REG_A",
+    [ARG_REG_B] = "REG_B",
+    [ARG_REG_C] = "REG_C",
+    [ARG_REG_D] = "REG_D",
+    [ARG_REG_E] = "REG_E",
+    [ARG_REG_H] = "REG_H",
+    [ARG_REG_L] = "REG_L",
+    [ARG_REG_AF] = "REG_AF",
+    [ARG_REG_BC] = "REG_BC",
+    [ARG_REG_DE] = "REG_DE",
+    [ARG_REG_HL] = "REG_HL",
+    [ARG_REG_SP] = "REG_SP",
+
+    [ARG_IND_C] = "IND_C",
+    [ARG_IND_BC] = "IND_BC",
+    [ARG_IND_DE] = "IND_DE",
+    [ARG_IND_HL] = "IND_HL",
+    [ARG_IND_HLI] = "IND_HLI",
+    [ARG_IND_HLD] = "IND_HLD",
+    [ARG_IND_IMM8] = "IND_IMM8",
+    [ARG_IND_IMM16] = "IND_IMM16",
+    [ARG_FLAG_ZERO] = "FLAG_ZERO",
+    [ARG_FLAG_CARRY] = "FLAG_CARRY",
+
+    [ARG_BIT_0] = "BIT_0",
+    [ARG_BIT_1] = "BIT_1",
+    [ARG_BIT_2] = "BIT_2",
+    [ARG_BIT_3] = "BIT_3",
+    [ARG_BIT_4] = "BIT_4",
+    [ARG_BIT_5] = "BIT_5",
+    [ARG_BIT_6] = "BIT_6",
+    [ARG_BIT_7] = "BIT_7",
+
+    [ARG_RST_0] = "RST_0",
+    [ARG_RST_1] = "RST_1",
+    [ARG_RST_2] = "RST_2",
+    [ARG_RST_3] = "RST_3",
+    [ARG_RST_4] = "RST_4",
+    [ARG_RST_5] = "RST_5",
+    [ARG_RST_6] = "RST_6",
+    [ARG_RST_7] = "RST_7",
+};
 
 void
 gb_cpu_reset(gb_cpu_t *cpu)
@@ -134,9 +173,9 @@ gb_cpu_get(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t src)
         value = gb_bus_read(bus, addr);
         break;
     case ARG_IND_IMM16:
-        addr = (uint16_t) (gb_bus_read(bus, cpu->pc++) << 0);
-        addr |= (uint16_t) (gb_bus_read(bus, cpu->pc++) << 8);
+        addr = gb_bus_read16(bus, cpu->pc);
         value = gb_bus_read(bus, addr);
+        cpu->pc += 2;
         break;
     case ARG_FLAG_CARRY:
         value = (uint16_t) cpu->flags.carry;
@@ -152,7 +191,7 @@ gb_cpu_get(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t src)
 static void
 gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
 {
-    uint8_t value8 = (uint8_t) value16;
+    uint8_t value = (uint8_t) value16;
     uint16_t addr = 0;
 
     switch (target) {
@@ -180,25 +219,25 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
         GB_BOUNDS_CHECK(gb_operand_names, target);
         GB_PANIC("invalid target operand: %s", gb_operand_names[target]);
     case ARG_REG_A:
-        cpu->a = value8;
+        cpu->a = value;
         break;
     case ARG_REG_B:
-        cpu->b = value8;
+        cpu->b = value;
         break;
     case ARG_REG_C:
-        cpu->c = value8;
+        cpu->c = value;
         break;
     case ARG_REG_D:
-        cpu->d = value8;
+        cpu->d = value;
         break;
     case ARG_REG_E:
-        cpu->e = value8;
+        cpu->e = value;
         break;
     case ARG_REG_H:
-        cpu->h = value8;
+        cpu->h = value;
         break;
     case ARG_REG_L:
-        cpu->l = value8;
+        cpu->l = value;
         break;
     case ARG_REG_AF:
         cpu->af = value16;
@@ -217,31 +256,31 @@ gb_cpu_set(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t target, uint16_t value16)
         break;
     case ARG_IND_C:
         addr = 0xFF00 + cpu->c;
-        gb_bus_write(bus, addr, value8);
+        gb_bus_write(bus, addr, value);
         break;
     case ARG_IND_BC:
-        gb_bus_write(bus, cpu->bc, value8);
+        gb_bus_write(bus, cpu->bc, value);
         break;
     case ARG_IND_DE:
-        gb_bus_write(bus, cpu->de, value8);
+        gb_bus_write(bus, cpu->de, value);
         break;
     case ARG_IND_HL:
-        gb_bus_write(bus, cpu->hl, value8);
+        gb_bus_write(bus, cpu->hl, value);
         break;
     case ARG_IND_HLI:
-        gb_bus_write(bus, cpu->hl++, value8);
+        gb_bus_write(bus, cpu->hl++, value);
         break;
     case ARG_IND_HLD:
-        gb_bus_write(bus, cpu->hl--, value8);
+        gb_bus_write(bus, cpu->hl--, value);
         break;
     case ARG_IND_IMM8:
         addr = 0xFF00 + gb_bus_read(bus, cpu->pc++);
-        gb_bus_write(bus, addr, value8);
+        gb_bus_write(bus, addr, value);
         break;
     case ARG_IND_IMM16:
-        addr = (uint16_t) (gb_bus_read(bus, cpu->pc++) << 0);
-        addr |= (uint16_t) (gb_bus_read(bus, cpu->pc++) << 8);
-        gb_bus_write(bus, addr, value8);
+        addr = gb_bus_read16(bus, cpu->pc);
+        gb_bus_write(bus, addr, value);
+        cpu->pc += 2;
         break;
     }
 }
@@ -268,16 +307,15 @@ gb_cpu_setbit(gb_cpu_t *cpu, gb_bus_t *bus, gb_operand_t arg, uint8_t bit, uint8
 static void
 gb_cpu_push(gb_cpu_t *cpu, gb_bus_t *bus, uint16_t value)
 {
-    gb_bus_write(bus, --cpu->sp, (uint8_t) (value >> 8));
-    gb_bus_write(bus, --cpu->sp, (uint8_t) (value >> 0));
+    cpu->sp -= 2;
+    gb_bus_write16(bus, cpu->sp, value);
 }
 
 static uint16_t
 gb_cpu_pop(gb_cpu_t *cpu, gb_bus_t *bus)
 {
-    uint16_t value = 0;
-    value |= (uint16_t) gb_bus_read(bus, cpu->sp++) << 0;
-    value |= (uint16_t) gb_bus_read(bus, cpu->sp++) << 8;
+    uint16_t value = gb_bus_read16(bus, cpu->sp);
+    cpu->sp += 2;
     return value;
 }
 
@@ -289,7 +327,7 @@ gb_cpu_decode(gb_bus_t *bus, uint16_t pc)
 
     // Prefixed instructions
     if (opcode == 0xCB) {
-        opcode = gb_bus_read(bus, pc + 1);
+        opcode = gb_bus_read(bus, pc+1);
         op = &gb_cb_opcodes[opcode];
     }
 
@@ -316,14 +354,14 @@ gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus)
     }
 
     if (op->handler == NULL)
-        GB_PANIC("invalid opcode 0x%02X", opcode);
+        GB_PANIC("invalid opcode: 0x%02X", opcode);
 
     cpu->stall = op->cycles - 1;
     op->handler(cpu, bus, op);
 
     // DI/EI take effect after the next instruction
     if (cpu->ime_delay >= 0) {
-        cpu->ime = cpu->ime_delay;
+        cpu->ime = (uint8_t) cpu->ime_delay;
         cpu->ime_delay = -1;
     }
 }
@@ -341,6 +379,79 @@ gb_nop(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     GB_UNUSED(cpu);
     GB_UNUSED(bus);
     GB_UNUSED(op);
+}
+
+/* DAA
+ * Flags: Z - 0 C
+ * Decimal adjust register A. */
+static void
+gb_daa(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    GB_UNUSED(bus);
+    GB_UNUSED(op);
+
+    uint8_t a = cpu->a;
+    uint8_t correction = cpu->flags.carry ? 0x60 : 0x00;
+
+    if (cpu->flags.half_carry || (!cpu->flags.negative && (a&0xF) > 9))
+        correction |= 0x06;
+
+    if (cpu->flags.carry || (!cpu->flags.negative && a > 0x99))
+        correction |= 0x60;
+
+    if (cpu->flags.negative) {
+        a -= correction;
+    } else {
+        a += correction;
+    }
+
+    cpu->flags.zero = a == 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = correction >= 0x60;
+
+    cpu->a = a;
+}
+
+/* CPL
+ * Flags: - 1 1 -
+ * Complement A register. */
+static void
+gb_cpl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    GB_UNUSED(bus);
+    GB_UNUSED(op);
+
+    cpu->a = ~cpu->a;
+    cpu->flags.negative = 1;
+    cpu->flags.half_carry = 1;
+}
+
+/* SCF
+ * Flags: - 0 0 1
+ * Set carry flag. */
+static void
+gb_scf(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    GB_UNUSED(bus);
+    GB_UNUSED(op);
+
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = 1;
+}
+
+/* CCF
+ * Flags: - 0 0 C
+ * Complement carry flag. */
+static void
+gb_ccf(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    GB_UNUSED(bus);
+    GB_UNUSED(op);
+
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = !cpu->flags.carry;
 }
 
 /* LD r8,r8
@@ -370,11 +481,13 @@ static void
 gb_inc8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+
+    uint8_t half_sum = (v&0xF) + 1;
     uint8_t r = v + 1;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xF) < (v&0xF);
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0xF;
 
     gb_cpu_set(cpu, bus, op->arg1, r);
 }
@@ -400,9 +513,23 @@ gb_dec8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = v - 1;
 
+    uint8_t half_sum = (v&0xF) - 1;
+
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 1;
-    cpu->flags.half_carry = (r&0xF) > (v&0xF);
+    cpu->flags.negative = 1;
+    cpu->flags.half_carry = half_sum > 0xF;
+
+    gb_cpu_set(cpu, bus, op->arg1, r);
+}
+
+/* DEC r16
+ * Flags: - - - -
+ * Decrement 16-bit register. */
+static void
+gb_dec16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
+{
+    uint16_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint16_t r = v - 1;
 
     gb_cpu_set(cpu, bus, op->arg1, r);
 }
@@ -415,12 +542,15 @@ gb_add_a(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
-    uint8_t r = a + v;
+
+    uint16_t sum = (uint16_t) a + (uint16_t) v;
+    uint8_t half_sum = (a&0xF) + (v&0xF);
+    uint8_t r = (uint8_t) sum;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xF) < (v&0xF);
-    cpu->flags.carry = r < v;
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
 
     cpu->a = r;
 }
@@ -433,11 +563,14 @@ gb_add_hl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint16_t v = gb_cpu_get(cpu, bus, op->arg1);
     uint16_t hl = cpu->hl;
-    uint16_t r = hl + v;
 
-    cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xFFF) < (hl&0xFFF);
-    cpu->flags.carry = r < hl;
+    uint16_t half_sum = (hl&0x0FFF) + (v&0x0FFF);
+    uint32_t sum = (uint32_t) hl + (uint32_t) v;
+    uint16_t r = (uint16_t) sum;
+
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0x0FFF;
+    cpu->flags.carry = sum > 0xFFFF;
 
     cpu->hl = r;
 }
@@ -450,12 +583,15 @@ gb_add_sp(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     int8_t v = (int8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint16_t sp = cpu->sp;
-    uint16_t r = sp + v;
+
+    int32_t sum = (int32_t) sp + (int32_t) v;
+    uint8_t half_sum = (sp&0xF) + (v&0xF);
+    uint16_t r = (uint16_t) sum;
 
     cpu->flags.zero = 0;
-    cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xF) < (sp&0xF);
-    cpu->flags.carry = r < sp;
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFFFF;
 
     cpu->sp = r;
 }
@@ -469,12 +605,15 @@ gb_adc8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
     uint8_t a = cpu->a;
-    uint8_t r = a + v + c;
+
+    uint16_t sum = (uint16_t) a + (uint16_t) v + (uint16_t) c;
+    uint8_t half_sum = (a&0xF) + (v&0xF) + c;
+    uint8_t r = (uint8_t) sum;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
-    cpu->flags.half_carry = (r&0xF) < (v&0xF);
-    cpu->flags.carry = r < v;
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
 
     cpu->a = r;
 }
@@ -487,12 +626,15 @@ gb_sub8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
-    uint8_t r = a - v;
+
+    uint16_t sum = (uint16_t) a - (uint16_t) v;
+    uint8_t half_sum = (a&0xF) - (v&0xF);
+    uint8_t r = (uint8_t) sum;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 1;
-    cpu->flags.half_carry = (r&0xF) > (a&0xF);
-    cpu->flags.carry = r > a;
+    cpu->flags.negative = 1;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
 
     cpu->a = r;
 }
@@ -506,12 +648,15 @@ gb_sbc8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
     uint8_t a = cpu->a;
-    uint8_t r = a - v - c;
+
+    uint16_t sum = (uint16_t) a - (uint16_t) v - (uint16_t) c;
+    uint8_t half_sum = (a&0xF) - (v&0xF) - c;
+    uint8_t r = (uint8_t) sum;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 1;
-    cpu->flags.half_carry = (r&0xF) > (a&0xF);
-    cpu->flags.carry = r > a;
+    cpu->flags.negative = 1;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
 
     cpu->a = r;
 }
@@ -527,7 +672,7 @@ gb_and8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t r = a & v;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 1;
     cpu->flags.carry = 0;
 
@@ -619,7 +764,7 @@ gb_xor8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t r = a ^ v;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = 0;
 
@@ -637,7 +782,7 @@ gb_or8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t r = a | v;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = 0;
 
@@ -652,12 +797,15 @@ gb_cp8(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
-    uint8_t r = a - v;
+
+    uint16_t sum = (uint16_t) a - (uint16_t) v;
+    uint8_t half_sum = (a&0xF) - (v&0xF);
+    uint8_t r = (uint8_t) sum;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 1;
-    cpu->flags.half_carry = (r&0xF) > (a&0xF);
-    cpu->flags.carry = r > a;
+    cpu->flags.negative = 1;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
 }
 
 /* PUSH r16
@@ -677,6 +825,10 @@ static void
 gb_pop16(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint16_t v = gb_cpu_pop(cpu, bus);
+
+    if (op->arg1 == ARG_REG_AF)
+        v &= 0xFFF0; // lower 4 bits of F are always zero
+
     gb_cpu_set(cpu, bus, op->arg1, v);
 }
 
@@ -796,10 +948,10 @@ static void
 gb_rlc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v << 1) | (v >> 7);
+    uint8_t r = (uint8_t) (v << 1) | (v >> 7);
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = (v >> 7) & 1;
 
@@ -812,11 +964,11 @@ gb_rlc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_rla(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v << 1) | cpu->flags.carry;
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) ((v << 1) | cpu->flags.carry);
 
     cpu->flags.zero = 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = (v >> 7) & 1;
 
@@ -829,11 +981,11 @@ gb_rla(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_rl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v << 1) | cpu->flags.carry;
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) ((v << 1) | cpu->flags.carry);
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = (v >> 7) & 1;
 
@@ -847,10 +999,10 @@ static void
 gb_rrca(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v >> 1) | (v << 7);
+    uint8_t r = (uint8_t) ((v >> 1) | (v << 7));
 
     cpu->flags.zero = 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -864,10 +1016,10 @@ static void
 gb_rrc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
     uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v >> 1) | (v << 7);
+    uint8_t r = (uint8_t) ((v >> 1) | (v << 7));
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -880,11 +1032,11 @@ gb_rrc(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_rra(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v >> 1) | (cpu->flags.carry << 7);
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) ((v >> 1) | (cpu->flags.carry << 7));
 
     cpu->flags.zero = 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -898,11 +1050,11 @@ gb_rra(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_rr(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = (v >> 1) | (cpu->flags.carry << 7);
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) ((v >> 1) | (cpu->flags.carry << 7));
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -915,11 +1067,11 @@ gb_rr(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_sla(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = v << 1;
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) (v << 1);
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = (v >> 7) & 1;
 
@@ -932,11 +1084,11 @@ gb_sla(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_sra(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = (v >> 1) | (v & 0x80);
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -949,11 +1101,11 @@ gb_sra(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_srl(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
     uint8_t r = v >> 1;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = v & 1;
 
@@ -990,11 +1142,13 @@ gb_ei(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 static void
 gb_swap(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
 {
-    uint8_t v = gb_cpu_get(cpu, bus, op->arg1);
-    uint8_t r = ((v & 0xF) << 4) | ((v & 0xF0) >> 4);
+    uint8_t v = (uint8_t) gb_cpu_get(cpu, bus, op->arg1);
+    uint8_t l = (uint8_t) ((v & 0x0F) << 4);
+    uint8_t h = (uint8_t) ((v & 0xF0) >> 4);
+    uint8_t r = l | h;
 
     cpu->flags.zero = r == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 0;
     cpu->flags.carry = 0;
 
@@ -1011,7 +1165,7 @@ gb_bit(gb_cpu_t *cpu, gb_bus_t *bus, const gb_instr_t *op)
     uint8_t v = gb_cpu_getbit(cpu, bus, op->arg2, bit);
 
     cpu->flags.zero = v == 0;
-    cpu->flags.subtract = 0;
+    cpu->flags.negative = 0;
     cpu->flags.half_carry = 1;
 }
 
@@ -1046,6 +1200,10 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0x00, ARG_NONE, ARG_NONE, gb_nop, 1, "NOP"),
     gb_op(0xF3, ARG_NONE, ARG_NONE, gb_di, 1, "DI"),
     gb_op(0xFB, ARG_NONE, ARG_NONE, gb_ei, 1, "EI"),
+    gb_op(0x27, ARG_NONE, ARG_NONE, gb_daa, 1, "DAA"),
+    gb_op(0x2F, ARG_NONE, ARG_NONE, gb_cpl, 1, "CPL"),
+    gb_op(0x37, ARG_NONE, ARG_NONE, gb_scf, 1, "SCF"),
+    gb_op(0x3F, ARG_NONE, ARG_NONE, gb_ccf, 1, "CCF"),
 
     gb_op(0x04, ARG_REG_B, ARG_NONE, gb_inc8, 1, "INC B"),
     gb_op(0x0C, ARG_REG_C, ARG_NONE, gb_inc8, 1, "INC C"),
@@ -1069,6 +1227,11 @@ const gb_instr_t gb_opcodes[256] = {
     gb_op(0x2D, ARG_REG_L, ARG_NONE, gb_dec8, 1, "DEC L"),
     gb_op(0x3D, ARG_REG_A, ARG_NONE, gb_dec8, 1, "DEC A"),
     gb_op(0x35, ARG_IND_HL, ARG_NONE, gb_dec8, 3, "DEC (HL)"),
+
+    gb_op(0x0B, ARG_REG_BC, ARG_NONE, gb_dec16, 2, "DEC BC"),
+    gb_op(0x1B, ARG_REG_DE, ARG_NONE, gb_dec16, 2, "DEC DE"),
+    gb_op(0x2B, ARG_REG_HL, ARG_NONE, gb_dec16, 2, "DEC HL"),
+    gb_op(0x3B, ARG_REG_SP, ARG_NONE, gb_dec16, 2, "DEC SP"),
 
     gb_op(0x02, ARG_IND_BC, ARG_REG_A, gb_ld8, 2, "LD (BC),A"),
     gb_op(0x0A, ARG_REG_A, ARG_IND_BC, gb_ld8, 2, "LD A,(BC)"),

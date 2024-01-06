@@ -17,19 +17,20 @@ typedef struct gb_bus_t {
     uint8_t oam[0xA0];    // 160B OAM (0xFE00 - 0xFE9F)
     uint8_t io[0x80];     // 128B I/O (0xFF00 - 0xFF7F)
     uint8_t hram[0x7F];   // 127B HRAM (0xFF80 - 0xFFFE)
+    uint8_t serial_data;  // Serial Data (0xFF01)
+    uint8_t serial_ctrl;  // Serial Control (0xFF02)
     uint8_t ie;           // Interrupt Enable (0xFFFF)
-
-    uint8_t serial_data; // Serial Data (0xFF01)
-    uint8_t serial_ctrl; // Serial Control (0xFF02)
 } gb_bus_t;
 
 void gb_bus_reset(gb_bus_t *bus);
 
 uint8_t gb_bus_read(gb_bus_t *bus, uint16_t addr);
 
+void gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data);
+
 uint16_t gb_bus_read16(gb_bus_t *bus, uint16_t addr);
 
-void gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data);
+void gb_bus_write16(gb_bus_t *bus, uint16_t addr, uint16_t data);
 
 void gb_bus_step(gb_bus_t *bus);
 

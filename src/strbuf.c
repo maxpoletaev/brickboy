@@ -10,7 +10,7 @@ static inline void
 gb_strbuf_check(gb_strbuf_t *buf, size_t newpos)
 {
     if (newpos+1 >= buf->cap) // +1 for null terminator
-        GB_PANIC("buffer is too short: %zu>%zu", newpos+1, buf->cap);
+        GB_PANIC("buffer is too short: %zu>%zu", newpos + 1, buf->cap);
 }
 
 void
@@ -66,8 +66,7 @@ gb_strbuf_addf(gb_strbuf_t *buf, const char *fmt, ...)
 }
 
 #ifdef GB_STRBUF_MAIN
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
     gb_strbuf_t buf;
     gb_strbuf_init(&buf);

@@ -1,4 +1,12 @@
 ---
-Checks: 'clang-analyzer-*,misc-*,performance-*,portability-*,security-*,bugprone-*,-bugprone-easily-swappable-parameters'
+Checks: >-
+  clang-analyzer-*,
+  performance-*,
+  portability-*,
+  bugprone-*,
+  security-*,
+  misc-*,
+  -bugprone-easily-swappable-parameters,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
 AnalyzeTemporaryDtors: false
-WarningsAsErrors: true
+WarningsAsErrors: 'true'

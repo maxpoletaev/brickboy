@@ -13,7 +13,7 @@ static const gb_mapper_vt *gb_mappers[256] = {
 };
 
 static const char *gb_mapper_names[256] = {
-    [0x00] = "ROM ONLY",
+    [0x00] = "ROM",
     [0x01] = "ROM+MBC1",
 };
 
@@ -25,7 +25,7 @@ gb_mapper_init(gb_mapper_t *mapper, gb_rom_t *rom)
     const char *name = gb_mapper_names[mapper_id];
 
     if (vt == NULL || name == NULL) {
-        GB_TRACE("unsupported mapper: %02X\n", mapper_id);
+        GB_TRACE("unsupported mapper: %02X", mapper_id);
         return GB_ERR;
     }
 
@@ -71,8 +71,8 @@ gb_mapper_free(gb_mapper_t *mapper)
 
     assert(mapper->vt->free != NULL);
     mapper->vt->free(mapper);
+
+    assert(mapper->impl == NULL); // nulled by vt->free
     mapper->name = NULL;
     mapper->vt = NULL;
-
-    assert(mapper->impl == NULL); // nulled by free
 }

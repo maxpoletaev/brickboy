@@ -10,8 +10,8 @@ gb_bus_reset(gb_bus_t *bus)
 {
     gb_mapper_reset(bus->mapper);
     memset(bus->ram, 0x00, sizeof(bus->ram));
-    memset(bus->vram, 0xFF, sizeof(bus->vram));
-    memset(bus->oam, 0xFF, sizeof(bus->oam));
+    memset(bus->vram, 0x00, sizeof(bus->vram));
+    memset(bus->oam, 0x00, sizeof(bus->oam));
     memset(bus->hram, 0xFF, sizeof(bus->hram));
     memset(bus->io, 0, sizeof(bus->io));
     bus->serial_data = 0;
@@ -19,7 +19,7 @@ gb_bus_reset(gb_bus_t *bus)
     bus->ie = 0;
 }
 
-#define gb_if_addr(start, end)            \
+#define gb_if_addr(start, end) \
     if (addr >= (start) && addr <= (end)) \
 
 uint8_t
@@ -53,30 +53,26 @@ gb_bus_read(gb_bus_t *bus, uint16_t addr)
     gb_if_addr(0xFF00, 0xFF7F) // I/O
         return 0;
 
-    gb_if_addr(0xFF80, 0xFFFE) { // HRAM
+    gb_if_addr(0xFF80, 0xFFFE) // HRAM
         return bus->hram[addr - 0xFF80];
-    }
 
     GB_TRACE("unhandled read from 0x%04X", addr);
-    return 0;
-}
 
-uint16_t
-gb_bus_read16(gb_bus_t *bus, uint16_t addr)
-{
-    uint16_t val = 0;
-    val |= (uint16_t) gb_bus_read(bus, addr + 0) << 0;
-    val |= (uint16_t) gb_bus_read(bus, addr + 1) << 8;
-    return val;
+    return 0;
 }
 
 static void
 gb_serial_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
 {
-    if (addr == 0xFF01) {
+    switch (addr) {
+    case 0xFF01:
         bus->serial_data = data;
-    } else if (addr == 0xFF02) {
+        break;
+    case 0xFF02:
         bus->serial_ctrl = data;
+        break;
+    default:
+        break;
     }
 }
 
@@ -84,7 +80,8 @@ void
 gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
 {
     gb_if_addr(0x0000, 0x7FFF) {
-        return gb_mapper_write(bus->mapper, addr, data);
+        gb_mapper_write(bus->mapper, addr, data);
+        return;
     }
 
     gb_if_addr(0xC000, 0xFDFF) {
@@ -121,6 +118,22 @@ gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
     }
 
     GB_TRACE("unhandled write to 0x%04X", addr);
+}
+
+uint16_t
+gb_bus_read16(gb_bus_t *bus, uint16_t addr)
+{
+    uint16_t val = 0;
+    val |= (uint16_t) gb_bus_read(bus, addr + 0) << 0;
+    val |= (uint16_t) gb_bus_read(bus, addr + 1) << 8;
+    return val;
+}
+
+void
+gb_bus_write16(gb_bus_t *bus, uint16_t addr, uint16_t data)
+{
+    gb_bus_write(bus, addr + 0, (uint8_t) (data >> 0));
+    gb_bus_write(bus, addr + 1, (uint8_t) (data >> 8));
 }
 
 void

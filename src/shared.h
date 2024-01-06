@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifndef BUILD_COMMIT_HASH
+#define BUILD_COMMIT_HASH "unknown"
+#endif
+
+#ifndef BUILD_VERSION
+#define BUILD_VERSION "unknown"
+#endif
+
 #define GB_OK 0
 
 #define GB_ERR 1
@@ -13,7 +21,7 @@
 
 #define GB_LOG(fmt, ...) fprintf(stdout, fmt "\n", ##__VA_ARGS__)
 
-#define GB_TRACE(fmt, ...) fprintf(stderr, "(%s:%d): " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+#define GB_TRACE(fmt, ...) fprintf(stderr, fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__)
 
 #define GB_ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
@@ -23,11 +31,11 @@
         abort(); \
     } while (0)
 
-#define GB_BOUNDS_CHECK(arr, idx)                                                   \
-    do {                                                                            \
-        if ((idx) >= GB_ARRAY_SIZE(arr)) {                                          \
+#define GB_BOUNDS_CHECK(arr, idx) \
+    do { \
+        if ((idx) >= GB_ARRAY_SIZE(arr)) { \
             GB_PANIC("index out of bounds"); \
-        }                                                                           \
+        } \
     } while (0)
 
 char *gb_cstring(char *data, size_t size);
