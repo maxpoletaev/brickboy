@@ -6,70 +6,76 @@
 #include "bus.h"
 
 void
-gb_bus_reset(gb_bus_t *bus)
+bus_reset(Bus *bus)
 {
-    gb_mapper_reset(bus->mapper);
+    mapper_reset(bus->mapper);
     memset(bus->ram, 0x00, sizeof(bus->ram));
     memset(bus->vram, 0x00, sizeof(bus->vram));
     memset(bus->oam, 0x00, sizeof(bus->oam));
-    memset(bus->hram, 0xFF, sizeof(bus->hram));
+    memset(bus->hram, 0x00, sizeof(bus->hram));
     memset(bus->io, 0, sizeof(bus->io));
-    bus->serial_data = 0;
-    bus->serial_ctrl = 0;
+    bus->sb = 0;
+    bus->sc = 0;
     bus->ie = 0;
+
+#if BUS_TESTROM_MODE
+    // Should be 0xFF to as in wheremyfoodat’s logs
+    memset(bus->hram, 0xFF, sizeof(bus->hram));
+#endif
 }
 
-#define gb_if_addr(start, end) \
-    if (addr >= (start) && addr <= (end)) \
+#define IF_ADDR(start, end) if (addr >= (start) && addr <= (end))
 
 uint8_t
-gb_bus_read(gb_bus_t *bus, uint16_t addr)
+bus_read(Bus *bus, uint16_t addr)
 {
 
-#if GB_BUS_LY_STUB
+#if BUS_TESTROM_MODE
     if (addr == 0xFF44)
         return 0x90;
 #endif
 
-    gb_if_addr(0x0000, 0x7FFF) // ROM
-        return gb_mapper_read(bus->mapper, addr);
+    if (addr == 0xFFFF)
+        return bus->ie;
 
-    gb_if_addr(0x8000, 0x9FFF) // Video RAM
+    IF_ADDR(0x0000, 0x7FFF) // ROM
+        return mapper_read(bus->mapper, addr);
+
+    IF_ADDR(0x8000, 0x9FFF) // Video RAM
         return bus->vram[addr - 0x8000];
 
-    gb_if_addr(0xA000, 0xBFFF) // External RAM
-        return gb_mapper_read(bus->mapper, addr);
+    IF_ADDR(0xA000, 0xBFFF) // External RAM
+        return mapper_read(bus->mapper, addr);
 
-    gb_if_addr(0xC000, 0xFDFF) { // Internal RAM
-        if (addr >= 0xE000)
-            addr -= 0x2000;
-
+    IF_ADDR(0xC000, 0xDFFF) // Internal RAM
         return bus->ram[addr - 0xC000];
-    }
 
-    gb_if_addr(0xFE00, 0xFE9F) // OAM
+    IF_ADDR(0xE000, 0xFDFF) // Internal RAM (mirror)
+        return bus->ram[addr - 0xE000];
+
+    IF_ADDR(0xFE00, 0xFE9F) // OAM
         return bus->oam[addr - 0xFE00];
 
-    gb_if_addr(0xFF00, 0xFF7F) // I/O
+    IF_ADDR(0xFF00, 0xFF7F) // I/O
         return 0;
 
-    gb_if_addr(0xFF80, 0xFFFE) // HRAM
+    IF_ADDR(0xFF80, 0xFFFE) // HRAM
         return bus->hram[addr - 0xFF80];
 
-    GB_TRACE("unhandled read from 0x%04X", addr);
+    TRACE("unhandled read from 0x%04X", addr);
 
     return 0;
 }
 
 static void
-gb_serial_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
+write_serial(Bus *bus, uint16_t addr, uint8_t data)
 {
     switch (addr) {
     case 0xFF01:
-        bus->serial_data = data;
+        bus->sb = data;
         break;
     case 0xFF02:
-        bus->serial_ctrl = data;
+        bus->sc = data;
         break;
     default:
         break;
@@ -77,67 +83,68 @@ gb_serial_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
 }
 
 void
-gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data)
+bus_write(Bus *bus, uint16_t addr, uint8_t data)
 {
-    gb_if_addr(0x0000, 0x7FFF) {
-        gb_mapper_write(bus->mapper, addr, data);
+    if (addr == 0xFFFF) {
+        bus->ie = data & 0x1F;
         return;
     }
 
-    gb_if_addr(0xC000, 0xFDFF) {
-        if (addr >= 0xE000)
-            addr -= 0x2000;
+    IF_ADDR(0x0000, 0x7FFF) {
+        mapper_write(bus->mapper, addr, data);
+        return;
+    }
 
+    IF_ADDR(0xC000, 0xDFFF) {
         bus->ram[addr - 0xC000] = data;
         return;
     }
 
-    gb_if_addr(0x8000, 0x9FFF) {
+    IF_ADDR(0xE000, 0xFDFF) {
+        bus->ram[addr - 0xE000] = data;
+        return;
+    }
+
+    IF_ADDR(0x8000, 0x9FFF) {
         bus->vram[addr - 0x8000] = data;
         return;
     }
 
-    gb_if_addr(0xA000, 0xBFFF) {
-        gb_mapper_write(bus->mapper, addr, data);
+    IF_ADDR(0xA000, 0xBFFF) {
+        mapper_write(bus->mapper, addr, data);
         return;
     }
 
-    gb_if_addr(0xFE00, 0xFE9F) {
+    IF_ADDR(0xFE00, 0xFE9F) {
         bus->oam[addr - 0xFE00] = data;
         return;
     }
 
-    gb_if_addr(0xFF00, 0xFF7F) {
-        gb_serial_write(bus, addr, data);
+    IF_ADDR(0xFF00, 0xFF7F) {
+        write_serial(bus, addr, data);
         return;
     }
 
-    gb_if_addr(0xFF80, 0xFFFE) {
+    IF_ADDR(0xFF80, 0xFFFE) {
         bus->hram[addr - 0xFF80] = data;
         return;
     }
 
-    GB_TRACE("unhandled write to 0x%04X", addr);
+    TRACE("unhandled write to 0x%04X", addr);
 }
 
 uint16_t
-gb_bus_read16(gb_bus_t *bus, uint16_t addr)
+bus_read16(Bus *bus, uint16_t addr)
 {
     uint16_t val = 0;
-    val |= (uint16_t) gb_bus_read(bus, addr + 0) << 0;
-    val |= (uint16_t) gb_bus_read(bus, addr + 1) << 8;
+    val |= (uint16_t) bus_read(bus, addr + 0) << 0;
+    val |= (uint16_t) bus_read(bus, addr + 1) << 8;
     return val;
 }
 
 void
-gb_bus_write16(gb_bus_t *bus, uint16_t addr, uint16_t data)
+bus_write16(Bus *bus, uint16_t addr, uint16_t data)
 {
-    gb_bus_write(bus, addr + 0, (uint8_t) (data >> 0));
-    gb_bus_write(bus, addr + 1, (uint8_t) (data >> 8));
-}
-
-void
-gb_bus_step(gb_bus_t *bus)
-{
-    bus->cycles += 1;
+    bus_write(bus, addr + 0, (uint8_t) (data >> 0));
+    bus_write(bus, addr + 1, (uint8_t) (data >> 8));
 }

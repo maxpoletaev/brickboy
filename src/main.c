@@ -14,7 +14,7 @@
 #include "cpu.h"
 #include "rom.h"
 
-static struct gb_opts_t {
+static struct Opts {
     char *romfile;
     char *debug_out;
     char *state_out;
@@ -22,10 +22,10 @@ static struct gb_opts_t {
     bool print_serial;
     bool no_logo;
     bool slow;
-} gb_opts;
+} opts;
 
 static void
-gb_print_logo(void)
+print_logo(void)
 {
     printf(" _          _      _    _                      \n");
     printf("| |__  _ __(_) ___| | _| |__   ___  _   _      \n");
@@ -36,19 +36,19 @@ gb_print_logo(void)
 }
 
 static void
-gb_print_usage(void)
+print_usage(void)
 {
     printf("Usage:\n");
     printf("  brickboy [OPTIONS...] romfile.gb \n");
 }
 
 static void
-gb_print_help(void)
+print_help(void)
 {
     printf("BrickBoy %s (%s)\n", BUILD_VERSION, BUILD_COMMIT_HASH);
     printf("\n");
 
-    gb_print_usage();
+    print_usage();
     printf("\n");
 
     printf("Options:\n");
@@ -63,7 +63,7 @@ gb_print_help(void)
     printf("  --slow                   Slow down the emulation speed\n");
 }
 
-static const struct option gb_longopts[] = {
+static const struct option longopts[] = {
     {"help", no_argument, NULL, 'h'},
 
     {"debuglog", required_argument, NULL, 'd'},
@@ -77,35 +77,35 @@ static const struct option gb_longopts[] = {
 };
 
 static void
-gb_args_parse(int argc, char **argv)
+args_parse(int argc, char **argv)
 {
     while (1) {
         int opt_index = 0;
         int opt = getopt_long(argc, argv, "hd:l:b:",
-                              gb_longopts, &opt_index);
+                              longopts, &opt_index);
 
         if (opt == -1)
             break;
 
         if (opt == 0) {
-            const struct option *o = &gb_longopts[opt_index];
+            const struct option *o = &longopts[opt_index];
             const char *name = o->name;
 
             if (strcmp(name, "slow") == 0) {
-                gb_opts.slow = true;
+                opts.slow = true;
                 continue;
             }
 
             if (strcmp(name, "serial") == 0) {
-                gb_opts.print_serial = true;
+                opts.print_serial = true;
                 continue;
             }
 
             if (strcmp(name, "breakpoint") == 0) {
-                gb_opts.breakpoint = (uint16_t) strtoul(optarg, NULL, 16);
+                opts.breakpoint = (uint16_t) strtoul(optarg, NULL, 16);
 
                 if (errno != 0) {
-                    GB_LOG("invalid breakpoint address: %s", optarg);
+                    LOG("invalid breakpoint address: %s", optarg);
                     exit(1);
                 }
 
@@ -113,7 +113,7 @@ gb_args_parse(int argc, char **argv)
             }
 
             if (strcmp(name, "nologo") == 0) {
-                gb_opts.no_logo = true;
+                opts.no_logo = true;
                 continue;
             }
 
@@ -122,41 +122,41 @@ gb_args_parse(int argc, char **argv)
 
         switch (opt) {
         case 'd':
-            gb_opts.debug_out = optarg;
+            opts.debug_out = optarg;
             break;
         case 'l':
-            gb_opts.state_out = optarg;
+            opts.state_out = optarg;
             break;
         case 's':
-            gb_opts.print_serial = true;
+            opts.print_serial = true;
             break;
         case 'h':
-            gb_print_help();
+            print_help();
             exit(0);
         case 'b':
-            gb_opts.breakpoint = (uint16_t) strtoul(optarg, NULL, 16);
+            opts.breakpoint = (uint16_t) strtoul(optarg, NULL, 16);
 
             if (errno != 0) {
-                GB_LOG("invalid breakpoint address: %s", optarg);
+                LOG("invalid breakpoint address: %s", optarg);
                 exit(1);
             }
             break;
         default:
-            gb_print_usage();
+            print_usage();
             exit(1);
         }
     }
 
     if (optind >= argc) {
-        gb_print_usage();
+        print_usage();
         exit(1);
     }
 
-    gb_opts.romfile = argv[optind];
+    opts.romfile = argv[optind];
 }
 
 static FILE*
-gb_output_file(const char *filename)
+output_file(const char *filename)
 {
     if (strcmp(filename, "-") == 0)
         return stdout;
@@ -166,25 +166,24 @@ gb_output_file(const char *filename)
 
 
 static inline void
-gb_print_state(gb_cpu_t *cpu, gb_bus_t *bus, FILE *out)
+print_state(CPU *cpu, Bus *bus, FILE *out)
 {
     fprintf(out, "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X",
             cpu->a, cpu->f, cpu->b, cpu->c, cpu->d, cpu->e, cpu->h, cpu->l, cpu->sp, cpu->pc);
 
     uint8_t bytes[4] = {
-        gb_bus_read(bus, cpu->pc),
-        gb_bus_read(bus, cpu->pc + 1),
-        gb_bus_read(bus, cpu->pc + 2),
-        gb_bus_read(bus, cpu->pc + 3),
+        bus_read(bus, cpu->pc),
+        bus_read(bus, cpu->pc + 1),
+        bus_read(bus, cpu->pc + 2),
+        bus_read(bus, cpu->pc + 3),
     };
 
     fprintf(out, " (%02X %02X %02X %02X)\n", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-#define GB_MAIN_EXIT(code, fmt, ...) \
+#define MAIN_EXIT(code, fmt, ...) \
     do {                             \
-                                     \
-        GB_LOG(fmt, ##__VA_ARGS__);  \
+        LOG(fmt, ##__VA_ARGS__);  \
         exit_code = code;            \
         goto cleanup;                \
     } while (0)
@@ -192,86 +191,101 @@ gb_print_state(gb_cpu_t *cpu, gb_bus_t *bus, FILE *out)
 int
 main(int argc, char **argv)
 {
-    gb_args_parse(argc, argv);
+    args_parse(argc, argv);
 
-    if (!gb_opts.no_logo)
-        gb_print_logo();
+    if (!opts.no_logo)
+        print_logo();
 
     int exit_code = 0;
     FILE *debug_out = NULL;
     FILE *state_out = NULL;
-    gb_mapper_t mapper;
-    gb_rom_t rom;
-    gb_bus_t bus;
-    gb_cpu_t cpu;
 
-    if (gb_opts.debug_out != NULL) {
-        debug_out = gb_output_file(gb_opts.debug_out);
+    Mapper mapper;
+    ROM rom;
+    Bus bus;
+    CPU cpu;
+
+    if (opts.debug_out != NULL) {
+        debug_out = output_file(opts.debug_out);
         if (debug_out == NULL)
-            GB_MAIN_EXIT(1, "failed to open debug output file: %s", gb_opts.debug_out);
+            MAIN_EXIT(1, "failed to open debug output file: %s", opts.debug_out);
     }
 
-    if (gb_opts.state_out != NULL) {
-        state_out = gb_output_file(gb_opts.state_out);
+    if (opts.state_out != NULL) {
+        state_out = output_file(opts.state_out);
 
         if (state_out == NULL)
-            GB_MAIN_EXIT(1, "failed to open state output file: %s", gb_opts.state_out);
+            MAIN_EXIT(1, "failed to open state output file: %s", opts.state_out);
     }
 
-    if (access(gb_opts.romfile, R_OK) != 0) // NOLINT(misc-include-cleaner): R_OK is defined in unistd.h
-        GB_MAIN_EXIT(1, "file not found: %s", gb_opts.romfile);
+    if (access(opts.romfile, R_OK) != 0) // NOLINT(misc-include-cleaner): R_OK is defined in unistd.h
+        MAIN_EXIT(1, "file not found: %s", opts.romfile);
 
-    if (gb_rom_open(&rom, gb_opts.romfile) != GB_OK)
-        GB_MAIN_EXIT(1, "failed to open rom file");
+    if (rom_open(&rom, opts.romfile) != RET_OK)
+        MAIN_EXIT(1, "failed to open rom file");
 
-    if (gb_mapper_init(&mapper, &rom) != GB_OK)
-        GB_MAIN_EXIT(1, "failed to initialize mapper");
+    if (mapper_init(&mapper, &rom) != RET_OK)
+        MAIN_EXIT(1, "failed to initialize mapper");
 
-    char *title = gb_cstring(rom.header->title, sizeof(rom.header->title));
-    GB_LOG("rom loaded: %s (%s)", title, mapper.name);
+    char *title = to_cstring(rom.header->title, sizeof(rom.header->title));
+    LOG("rom loaded: %s (%s)", title, mapper.name);
     free(title);
 
     bus.mapper = &mapper;
-    gb_bus_reset(&bus);
-    gb_cpu_reset(&cpu);
+    bus_reset(&bus);
+    cpu_reset(&cpu);
 
-    if (gb_opts.print_serial)
-        GB_LOG("printing serial output is enabled");
+    if (opts.print_serial)
+        LOG("printing serial output is enabled");
 
-    if (gb_opts.breakpoint != 0)
-        GB_LOG("breakpoint set to 0x%04X", gb_opts.breakpoint);
+    if (opts.breakpoint != 0)
+        LOG("breakpoint set to 0x%04X", opts.breakpoint);
 
     while (1) {
-        bool end_of_instruction = cpu.stall == 0;
-
-        if (end_of_instruction) {
+        if (cpu.remaining == 0) {
             if (debug_out != NULL)
-                gb_disasm_step(&bus, &cpu, debug_out);
+                disasm_step(&bus, &cpu, debug_out);
             if (state_out != NULL)
-                gb_print_state(&cpu, &bus, state_out);
+                print_state(&cpu, &bus, state_out);
+
+            if (bus.ie_bits.vblank && bus.if_bits.vblank) {
+                cpu_interrupt(&cpu, &bus, INTERRUPT_VBLANK);
+                bus.if_bits.vblank = 0;
+            } else if (bus.ie_bits.lcd_stat && bus.if_bits.lcd_stat) {
+                cpu_interrupt(&cpu, &bus, INTERRUPT_LCDSTAT);
+                bus.if_bits.lcd_stat = 0;
+            } else if (bus.ie_bits.timer && bus.if_bits.timer) {
+                cpu_interrupt(&cpu, &bus, INTERRUPT_TIMER);
+                bus.if_bits.timer = 0;
+            } else if (bus.ie_bits.serial && bus.if_bits.serial) {
+                cpu_interrupt(&cpu, &bus, INTERRUPT_SERIAL);
+                bus.if_bits.serial = 0;
+            } else if (bus.ie_bits.joypad && bus.if_bits.joypad) {
+                cpu_interrupt(&cpu, &bus, INTERRUPT_JOYPAD);
+                bus.if_bits.joypad = 0;
+            }
         }
 
-        gb_cpu_step(&cpu, &bus);
-        gb_bus_step(&bus);
+        cpu_step(&cpu, &bus);
 
-        if (bus.serial_ctrl == 0x81 && gb_opts.print_serial) {
-            fputc(bus.serial_data, stdout);
-            bus.serial_ctrl = 0x01;
+        if (bus.sc == 0x81 && opts.print_serial) {
+            fputc(bus.sb, stdout);
+            bus.sc = 0x01;
             fflush(stdout);
         }
 
-        if (gb_opts.breakpoint > 0 && cpu.pc == gb_opts.breakpoint) {
-            GB_LOG("breakpoint reached at 0x%04X\n", cpu.pc);
+        if (opts.breakpoint > 0 && cpu.pc == opts.breakpoint) {
+            LOG("breakpoint reached at 0x%04X\n", cpu.pc);
             break;
         }
 
-        if (gb_opts.slow)
+        if (opts.slow)
             usleep(1000);
     }
 
 cleanup:
-    gb_mapper_free(&mapper);
-    gb_rom_free(&rom);
+    mapper_free(&mapper);
+    rom_free(&rom);
 
     if (debug_out != NULL && debug_out != stdout)
         fclose(debug_out);

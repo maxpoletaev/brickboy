@@ -2,24 +2,25 @@
 #define BRICKBOY_MBC0_H
 
 #include <stdint.h>
+
 #include "rom.h"
 #include "mapper.h"
 
 typedef struct {
-    gb_rom_t *rom;
-} gb_mbc0_t;
+    ROM *rom;
+} MBC0;
 
-const gb_mapper_vt gb_mbc0_vtable;
+const MapperVT mbc0_vtable;
 
-int gb_mbc0_init(gb_mapper_t *mapper, gb_rom_t *rom);
+int mbc0_init(Mapper *mapper, ROM *rom);
 
-void gb_mbc0_write(gb_mapper_t *mapper, uint16_t addr, uint8_t data);
+void mbc0_write(Mapper *mapper, uint16_t addr, uint8_t data);
 
-uint8_t gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr);
+uint8_t mbc0_read(Mapper *mapper, uint16_t addr);
 
-void gb_mbc0_free(gb_mapper_t *mapper);
+void mbc0_free(Mapper *mapper);
 
-void gb_mbc0_reset(gb_mapper_t *mapper);
+void mbc0_reset(Mapper *mapper);
 
 
 #endif //BRICKBOY_MBC0_H

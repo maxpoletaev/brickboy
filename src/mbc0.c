@@ -7,66 +7,66 @@
 #include "rom.h"
 #include "mbc0.h"
 
-const gb_mapper_vt gb_mbc0_vtable = {
-    .init = gb_mbc0_init,
-    .write = gb_mbc0_write,
-    .read = gb_mbc0_read,
-    .reset = gb_mbc0_reset,
-    .free = gb_mbc0_free,
+const MapperVT mbc0_vtable = {
+    .init = mbc0_init,
+    .write = mbc0_write,
+    .read = mbc0_read,
+    .reset = mbc0_reset,
+    .free = mbc0_free,
 };
 
-static inline gb_mbc0_t *
-gb_impl(gb_mapper_t *mapper)
+static inline MBC0 *
+mbc0_impl(Mapper *mapper)
 {
-    return (gb_mbc0_t *) mapper->impl;
+    return (MBC0 *) mapper->impl;
 }
 
 int
-gb_mbc0_init(gb_mapper_t *mapper, gb_rom_t *rom)
+mbc0_init(Mapper *mapper, ROM *rom)
 {
-    gb_mbc0_t *impl = calloc(1, sizeof(gb_mbc0_t));
+    MBC0 *impl = calloc(1, sizeof(MBC0));
     if (impl == NULL) {
-        GB_TRACE("failed to allocate memory");
-        return GB_ERR;
+        TRACE("failed to allocate memory");
+        return RET_ERR;
     }
 
     impl->rom = rom;
     mapper->impl = impl;
 
-    return GB_OK;
+    return RET_OK;
 }
 
 void
-gb_mbc0_free(gb_mapper_t *mapper)
+mbc0_free(Mapper *mapper)
 {
     free(mapper->impl);
     mapper->impl = NULL;
 }
 
 void
-gb_mbc0_reset(gb_mapper_t *mapper)
+mbc0_reset(Mapper *mapper)
 {
-    GB_UNUSED(mapper);
+    UNUSED(mapper);
 }
 
 uint8_t
-gb_mbc0_read(gb_mapper_t *mapper, uint16_t addr)
+mbc0_read(Mapper *mapper, uint16_t addr)
 {
-    gb_mbc0_t *impl = gb_impl(mapper);
+    MBC0 *impl = mbc0_impl(mapper);
 
     if (addr >= impl->rom->size)
-        GB_PANIC("out of bounds read at 0x%04X", addr);
+        PANIC("out of bounds read at 0x%04X", addr);
 
     return impl->rom->data[addr];
 }
 
 void
-gb_mbc0_write(gb_mapper_t *mapper, uint16_t addr, uint8_t data)
+mbc0_write(Mapper *mapper, uint16_t addr, uint8_t data)
 {
-    gb_mbc0_t *impl = gb_impl(mapper);
+    MBC0 *impl = mbc0_impl(mapper);
 
     if (addr >= impl->rom->size)
-        GB_PANIC("out of bounds write at 0x%04X", addr);
+        PANIC("out of bounds write at 0x%04X", addr);
 
     impl->rom->data[addr] = data;
 }

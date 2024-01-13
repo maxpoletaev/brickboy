@@ -5,30 +5,30 @@
 #include <assert.h>
 #include "rom.h"
 
-typedef struct gb_mapper_t gb_mapper_t;
+typedef struct Mapper Mapper;
 
 typedef struct {
-    int (*init)(gb_mapper_t *mapper, gb_rom_t *rom);
-    void (*write)(gb_mapper_t *mapper, uint16_t addr, uint8_t data);
-    uint8_t (*read)(gb_mapper_t *mapper, uint16_t addr);
-    void (*reset)(gb_mapper_t *mapper);
-    void (*free)(gb_mapper_t *mapper);
-} gb_mapper_vt;
+    int (*init)(Mapper *mapper, ROM *rom);
+    void (*write)(Mapper *mapper, uint16_t addr, uint8_t data);
+    uint8_t (*read)(Mapper *mapper, uint16_t addr);
+    void (*reset)(Mapper *mapper);
+    void (*free)(Mapper *mapper);
+} MapperVT;
 
-struct gb_mapper_t {
+struct Mapper {
     void *impl;
     const char *name;
-    const gb_mapper_vt *vt;
+    const MapperVT *vt;
 };
 
-int gb_mapper_init(gb_mapper_t *mapper, gb_rom_t *rom);
+int mapper_init(Mapper *mapper, ROM *rom);
 
-void gb_mapper_write(gb_mapper_t *mapper, uint16_t addr, uint8_t data);
+void mapper_write(Mapper *mapper, uint16_t addr, uint8_t data);
 
-uint8_t gb_mapper_read(gb_mapper_t *mapper, uint16_t addr);
+uint8_t mapper_read(Mapper *mapper, uint16_t addr);
 
-void gb_mapper_reset(gb_mapper_t *mapper);
+void mapper_reset(Mapper *mapper);
 
-void gb_mapper_free(gb_mapper_t *mapper);
+void mapper_free(Mapper *mapper);
 
 #endif //BRICKBOY_MAPPER_H

@@ -18,7 +18,7 @@ You will need `cmake`, `make` and a C compiler (GCC or Clang).
  - [ ] 08-misc instrs
  - [ ] 09-op r,r
  - [x] 10-bit ops
- - [ ] 11-op a,(hl)
+ - [x] 11-op a,(hl)
 
 ```bash
 cmake .
@@ -30,4 +30,5 @@ make
 - [Pan Docs](https://gbdev.io/pandocs/)
 - [CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
 - [Opcodes Table](https://meganesu.github.io/generate-gb-opcodes/) by meganesu
-- [Gameboy Logs](https://github.com/wheremyfoodat/Gameboy-logs/tree/master) by wheremyfoodat
+- [Gameboy Logs](https://github.com/wheremyfoodat/Gameboy-logs) by wheremyfoodat
+- [Test ROMs](https://github.com/retrio/gb-test-roms) (mirror of Blargg’s tests)

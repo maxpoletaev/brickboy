@@ -11,15 +11,15 @@ typedef struct {
     uint8_t half_carry : 1;
     uint8_t negative : 1;
     uint8_t zero : 1;
-} gb_cpu_flags_t;
+} CPUFlags;
 
-typedef struct gb_cpu_t {
+typedef struct CPU {
     // AF register
     union {
         uint16_t af;
         struct {
             union {
-                gb_cpu_flags_t flags;
+                CPUFlags flags;
                 uint8_t f;
             };
             uint8_t a;
@@ -56,11 +56,12 @@ typedef struct gb_cpu_t {
     uint16_t sp;
     uint16_t pc;
     uint8_t ime;
-    int8_t ime_delay;
+    uint8_t halted;
 
-    uint8_t stall;
     uint64_t cycle;
-} gb_cpu_t;
+    int8_t ime_delay;
+    uint8_t remaining;
+} CPU;
 
 typedef enum {
     ARG_NONE = 0,
@@ -120,37 +121,45 @@ typedef enum {
     ARG_RST_5, // $28
     ARG_RST_6, // $30
     ARG_RST_7, // $38
-} gb_operand_t;
+} Operand;
 
-const char *gb_operand_names[ARG_RST_7 + 1];
+typedef enum {
+    INTERRUPT_VBLANK = 0,
+    INTERRUPT_LCDSTAT = 1,
+    INTERRUPT_TIMER = 2,
+    INTERRUPT_SERIAL = 3,
+    INTERRUPT_JOYPAD = 4,
+} Interrupt;
 
-typedef struct gb_instr_t gb_instr_t;
+typedef struct Instruction Instruction;
 
-typedef struct gb_bus_t gb_bus_t;
+typedef struct Bus Bus;
 
-typedef void (*cpu_handler_t)(
-    gb_cpu_t *cpu,
-    gb_bus_t *bus,
-    const gb_instr_t *instr
+typedef void (*Handler)(
+    CPU *cpu,
+    Bus *bus,
+    const Instruction *instr
 );
 
-struct gb_instr_t {
+struct Instruction {
     uint8_t opcode;
     uint8_t cycles;
-    gb_operand_t arg1;
-    gb_operand_t arg2;
-    cpu_handler_t handler;
+    Operand arg1;
+    Operand arg2;
+    Handler handler;
     const char *text;
 };
 
-void gb_cpu_reset(gb_cpu_t *cpu);
+void cpu_reset(CPU *cpu);
 
-void gb_cpu_step(gb_cpu_t *cpu, gb_bus_t *bus);
+void cpu_step(CPU *cpu, Bus *bus);
 
-const gb_instr_t *gb_cpu_decode(gb_bus_t *bus, uint16_t pc);
+void cpu_interrupt(CPU *cpu, Bus *bus, Interrupt interrupt);
 
-const gb_instr_t gb_opcodes[256];
+const Instruction *cpu_decode(Bus *bus, uint16_t pc);
 
-const gb_instr_t gb_cb_opcodes[256];
+const Instruction opcodes[256];
+
+const Instruction cb_opcodes[256];
 
 #endif //BRICKBOY_CPU_H

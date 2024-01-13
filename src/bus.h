@@ -5,33 +5,50 @@
 #include "mapper.h"
 
 #include "rom.h"
+#include "timer.h"
 
-#define GB_BUS_LY_STUB 1
+#define BUS_TESTROM_MODE 1
 
-typedef struct gb_bus_t {
-    uint64_t cycles;
+typedef struct {
+    uint8_t vblank : 1;
+    uint8_t lcd_stat : 1;
+    uint8_t timer : 1;
+    uint8_t serial : 1;
+    uint8_t joypad : 1;
+    uint8_t unused : 3;
+} IntFlags;
 
-    gb_mapper_t *mapper;  // Cartridge ROM (0x0000 - 0x7FFF) + ERAM (0xA000 - 0xBFFF)
+typedef struct Bus {
+    Mapper *mapper;  // Cartridge ROM (0x0000 - 0x7FFF) + ERAM (0xA000 - 0xBFFF)
     uint8_t vram[0x2000]; // 8KB VRAM (0x8000 - 0x9FFF)
     uint8_t ram[0x2000];  // 8KB WRAM (0xC000 - 0xDFFF) + Mirror (0xE000 - 0xFDFF)
     uint8_t oam[0xA0];    // 160B OAM (0xFE00 - 0xFE9F)
     uint8_t io[0x80];     // 128B I/O (0xFF00 - 0xFF7F)
     uint8_t hram[0x7F];   // 127B HRAM (0xFF80 - 0xFFFE)
-    uint8_t serial_data;  // Serial Data (0xFF01)
-    uint8_t serial_ctrl;  // Serial Control (0xFF02)
-    uint8_t ie;           // Interrupt Enable (0xFFFF)
-} gb_bus_t;
 
-void gb_bus_reset(gb_bus_t *bus);
+    uint8_t sb;  // Serial Data (0xFF01)
+    uint8_t sc;  // Serial Control (0xFF02)
+    Timer timer; // Timer (0xFF04 - 0xFF07)
 
-uint8_t gb_bus_read(gb_bus_t *bus, uint16_t addr);
+    union {
+        uint8_t ie;
+        IntFlags ie_bits;
+    }; // Interrupt Enable (0xFFFF)
 
-void gb_bus_write(gb_bus_t *bus, uint16_t addr, uint8_t data);
+    union {
+        uint8_t if_;
+        IntFlags if_bits;
+    }; // Interrupt Flags (0xFF0F)
+} Bus;
 
-uint16_t gb_bus_read16(gb_bus_t *bus, uint16_t addr);
+void bus_reset(Bus *bus);
 
-void gb_bus_write16(gb_bus_t *bus, uint16_t addr, uint16_t data);
+uint8_t bus_read(Bus *bus, uint16_t addr);
 
-void gb_bus_step(gb_bus_t *bus);
+void bus_write(Bus *bus, uint16_t addr, uint8_t data);
+
+uint16_t bus_read16(Bus *bus, uint16_t addr);
+
+void bus_write16(Bus *bus, uint16_t addr, uint16_t data);
 
 #endif //OHMYBOY_BUS_H

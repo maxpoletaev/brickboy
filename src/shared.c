@@ -5,7 +5,7 @@
 #include "shared.h"
 
 inline char *
-gb_cstring(char *data, size_t size)
+to_cstring(char *data, size_t size)
 {
     char *str = malloc(size + 1);
     strncpy(str, data, size);
