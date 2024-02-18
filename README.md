@@ -16,7 +16,7 @@ You will need `cmake`, `make` and a C compiler (GCC or Clang).
  - [x] 06-ld r,r
  - [ ] 07-jr,jp,call,ret,rst
  - [ ] 08-misc instrs
- - [ ] 09-op r,r
+ - [x] 09-op r,r
  - [x] 10-bit ops
  - [x] 11-op a,(hl)
 

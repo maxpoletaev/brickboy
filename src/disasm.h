@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 #include "cpu.h"
-#include "bus.h"
+#include "mmu.h"
 
-void disasm_step(Bus *bus, CPU *cpu, FILE *out);
+void disasm_step(MMU *mmu, CPU *cpu, FILE *out);
 
 #endif //BRICKBOY_DISASM_H

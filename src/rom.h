@@ -2,17 +2,19 @@
 #define BRICKBOY_ROM_H
 
 #define ROM_MIN_SIZE (0x0100 + sizeof(ROMHeader))
-#define ROM_MAX_SIZE (2*1024*1024) // 2MB
+#define ROM_MAX_SIZE (2 * 1024 * 1024) // 2MB
 
 #include <stdint.h>
 
-typedef struct ROMHeader {
+#include "common.h"
+
+typedef struct {
     uint8_t entry_point[4];     // 0x0100 - 0x0103
     uint8_t logo[48];           // 0x0104 - 0x0133
     char title[16];             // 0x0134 - 0x0143
     uint16_t new_licensee_code; // 0x0144 - 0x0145
     uint8_t sgb_flag;           // 0x0146
-    uint8_t cartridge_type;     // 0x0147
+    uint8_t type;               // 0x0147
     uint8_t rom_size;           // 0x0148
     uint8_t ram_size;           // 0x0149
     uint8_t destination_code;   // 0x014A
@@ -20,7 +22,7 @@ typedef struct ROMHeader {
     uint8_t mask_rom_version;   // 0x014C
     uint8_t header_checksum;    // 0x014D
     uint16_t global_checksum;   // 0x014E - 0x014F
-} ROMHeader;
+} PACKED ROMHeader;
 
 typedef struct {
     ROMHeader *header;
@@ -32,4 +34,4 @@ int rom_open(ROM *rom, const char *filename);
 
 void rom_free(ROM *rom);
 
-#endif //BRICKBOY_ROM_H
+#endif // BRICKBOY_ROM_H

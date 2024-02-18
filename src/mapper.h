@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <assert.h>
+
 #include "rom.h"
 
 typedef struct Mapper Mapper;
@@ -17,6 +18,7 @@ typedef struct {
 
 struct Mapper {
     void *impl;
+    uint8_t id;
     const char *name;
     const MapperVT *vt;
 };

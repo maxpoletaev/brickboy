@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <assert.h>
 
-#include "shared.h"
 #include "cpu.h"
-#include "bus.h"
+#include "common.h"
+#include "mmu.h"
 
 static const uint16_t reset_addr[8] = {
     0x00, 0x08, 0x10, 0x18,
@@ -23,13 +23,13 @@ cpu_reset(CPU *cpu)
     cpu->sp = 0xFFFE;
     cpu->pc = 0x0100; // skip the boot rom for now
     cpu->ime = 0;
-    cpu->remaining = 0;
     cpu->cycle = 0;
     cpu->ime_delay = -1;
+    cpu->step = 0;
 }
 
 static uint16_t
-cpu_get_operand(CPU *cpu, Bus *bus, Operand src)
+cpu_get_operand(CPU *cpu, MMU *bus, Operand src)
 {
     uint16_t value = 0;
     uint16_t addr = 0;
@@ -58,7 +58,7 @@ cpu_get_operand(CPU *cpu, Bus *bus, Operand src)
         value = reset_addr[src - ARG_RST_0];
         break;
     case ARG_IMM16:
-        value = bus_read16(bus, cpu->pc);
+        value = mmu_read16(bus, cpu->pc);
         cpu->pc += 2;
         break;
     case ARG_REG_A:
@@ -99,33 +99,33 @@ cpu_get_operand(CPU *cpu, Bus *bus, Operand src)
         break;
     case ARG_IND_C:
         addr = 0xFF00 + cpu->c;
-        value = bus_read(bus, addr);
+        value = mmu_read(bus, addr);
         break;
     case ARG_IND_BC:
-        value = bus_read(bus, cpu->bc);
+        value = mmu_read(bus, cpu->bc);
         break;
     case ARG_IND_DE:
-        value = bus_read(bus, cpu->de);
+        value = mmu_read(bus, cpu->de);
         break;
     case ARG_IND_HL:
-        value = bus_read(bus, cpu->hl);
+        value = mmu_read(bus, cpu->hl);
         break;
     case ARG_IND_HLI:
-        value = bus_read(bus, cpu->hl++);
+        value = mmu_read(bus, cpu->hl++);
         break;
     case ARG_IND_HLD:
-        value = bus_read(bus, cpu->hl--);
+        value = mmu_read(bus, cpu->hl--);
         break;
     case ARG_IMM8:
-        value = bus_read(bus, cpu->pc++);
+        value = mmu_read(bus, cpu->pc++);
         break;
     case ARG_IND_IMM8:
-        addr = 0xFF00 + bus_read(bus, cpu->pc++);
-        value = bus_read(bus, addr);
+        addr = 0xFF00 + mmu_read(bus, cpu->pc++);
+        value = mmu_read(bus, addr);
         break;
     case ARG_IND_IMM16:
-        addr = bus_read16(bus, cpu->pc);
-        value = bus_read(bus, addr);
+        addr = mmu_read16(bus, cpu->pc);
+        value = mmu_read(bus, addr);
         cpu->pc += 2;
         break;
     case ARG_FLAG_CARRY:
@@ -140,7 +140,7 @@ cpu_get_operand(CPU *cpu, Bus *bus, Operand src)
 }
 
 static void
-cpu_set_operand(CPU *cpu, Bus *bus, Operand target, uint16_t value16)
+cpu_set_operand(CPU *cpu, MMU *bus, Operand target, uint16_t value16)
 {
     uint8_t value = (uint8_t) value16;
     uint16_t addr = 0;
@@ -206,44 +206,44 @@ cpu_set_operand(CPU *cpu, Bus *bus, Operand target, uint16_t value16)
         break;
     case ARG_IND_C:
         addr = 0xFF00 + cpu->c;
-            bus_write(bus, addr, value);
+        mmu_write(bus, addr, value);
         break;
     case ARG_IND_BC:
-        bus_write(bus, cpu->bc, value);
+        mmu_write(bus, cpu->bc, value);
         break;
     case ARG_IND_DE:
-        bus_write(bus, cpu->de, value);
+        mmu_write(bus, cpu->de, value);
         break;
     case ARG_IND_HL:
-        bus_write(bus, cpu->hl, value);
+        mmu_write(bus, cpu->hl, value);
         break;
     case ARG_IND_HLI:
-        bus_write(bus, cpu->hl++, value);
+        mmu_write(bus, cpu->hl++, value);
         break;
     case ARG_IND_HLD:
-        bus_write(bus, cpu->hl--, value);
+        mmu_write(bus, cpu->hl--, value);
         break;
     case ARG_IND_IMM8:
-        addr = 0xFF00 + bus_read(bus, cpu->pc++);
-            bus_write(bus, addr, value);
+        addr = 0xFF00 + mmu_read(bus, cpu->pc++);
+        mmu_write(bus, addr, value);
         break;
     case ARG_IND_IMM16:
-        addr = bus_read16(bus, cpu->pc);
-            bus_write(bus, addr, value);
+        addr = mmu_read16(bus, cpu->pc);
+        mmu_write(bus, addr, value);
         cpu->pc += 2;
         break;
     }
 }
 
 static uint8_t
-cpu_getbit(CPU *cpu, Bus *bus, Operand arg, uint8_t bit)
+cpu_getbit(CPU *cpu, MMU *bus, Operand arg, uint8_t bit)
 {
     uint8_t value = (uint8_t) cpu_get_operand(cpu, bus, arg);
     return (value >> bit) & 1;
 }
 
 static void
-cpu_setbit(CPU *cpu, Bus *bus, Operand arg, uint8_t bit, uint8_t value)
+cpu_setbit(CPU *cpu, MMU *bus, Operand arg, uint8_t bit, uint8_t value)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, arg);
 
@@ -255,99 +255,111 @@ cpu_setbit(CPU *cpu, Bus *bus, Operand arg, uint8_t bit, uint8_t value)
 }
 
 static void
-cpu_push(CPU *cpu, Bus *bus, uint16_t value)
+cpu_push(CPU *cpu, MMU *bus, uint16_t value)
 {
     cpu->sp -= 2;
-    bus_write16(bus, cpu->sp, value);
+    mmu_write16(bus, cpu->sp, value);
 }
 
 static uint16_t
-cpu_pop(CPU *cpu, Bus *bus)
+cpu_pop(CPU *cpu, MMU *bus)
 {
-    uint16_t value = bus_read16(bus, cpu->sp);
+    uint16_t value = mmu_read16(bus, cpu->sp);
     cpu->sp += 2;
     return value;
 }
 
 const Instruction *
-cpu_decode(Bus *bus, uint16_t pc)
+cpu_decode(MMU *bus, uint16_t pc)
 {
-    uint8_t opcode = bus_read(bus, pc);
+    uint8_t opcode = mmu_read(bus, pc);
     const Instruction *op = &opcodes[opcode];
 
     // Prefixed instructions
     if (opcode == 0xCB) {
-        opcode = bus_read(bus, pc + 1);
+        opcode = mmu_read(bus, pc + 1);
         op = &cb_opcodes[opcode];
     }
 
     return op;
 }
 
-void
-cpu_interrupt(CPU *cpu, Bus *bus, Interrupt interrupt)
+bool
+cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc)
 {
     cpu->halted = false;
-    if (cpu->ime == 0)
-        return;
+
+    if (cpu->ime == 0) {
+        return false;
+    }
 
     cpu->ime = 0; // disable interrupts
+
     cpu_push(cpu, bus, cpu->pc);
 
-    switch (interrupt) {
-    case INTERRUPT_VBLANK:
-        cpu->pc = 0x0040;
-        break;
-    case INTERRUPT_LCDSTAT:
-        cpu->pc = 0x0048;
-        break;
-    case INTERRUPT_TIMER:
-        cpu->pc = 0x0050;
-        break;
-    case INTERRUPT_SERIAL:
-        cpu->pc = 0x0058;
-        break;
-    case INTERRUPT_JOYPAD:
-        cpu->pc = 0x0060;
-        break;
-    }
+    cpu->pc = pc;
+
+    return true;
 }
 
-void
-cpu_step(CPU *cpu, Bus *bus)
+static inline const Instruction *
+cpu_execute(CPU *cpu, MMU *bus)
 {
-
-    if (cpu->halted)
-        return;
-
-    cpu->cycle++;
-
-    // Currently executing an instruction.
-    if (cpu->remaining > 0) {
-        cpu->remaining--;
-        return;
-    }
-
-    uint8_t opcode = bus_read(bus, cpu->pc++);
+    uint8_t opcode = mmu_read(bus, cpu->pc++);
     const Instruction *op = &opcodes[opcode];
 
     // Prefixed instructions
     if (opcode == 0xCB) {
-        opcode = bus_read(bus, cpu->pc++);
+        opcode = mmu_read(bus, cpu->pc++);
         op = &cb_opcodes[opcode];
     }
 
-    if (op->handler == NULL)
+    if (op->handler == NULL) {
         PANIC("invalid opcode: 0x%02X", opcode);
-
-    cpu->remaining = op->cycles - 1;
-    op->handler(cpu, bus, op);
+    }
 
     // EI takes effect one instruction later
     if (cpu->ime_delay != -1) {
         cpu->ime = cpu->ime_delay;
         cpu->ime_delay = -1;
     }
+
+    op->handler(cpu, bus, op);
+
+    return op;
+}
+
+void
+cpu_step(CPU *cpu, MMU *bus)
+{
+    if (cpu->step > 0) {
+        cpu->step--;
+        return;
+    }
+
+    if (cpu->halted) {
+        return;
+    }
+
+    const Instruction *op = cpu_execute(cpu, bus);
+
+    cpu->step = op->cycles - 1;
+}
+
+int
+cpu_step_fast(CPU *cpu, MMU *bus)
+{
+    if (cpu->halted) {
+        return 0;
+    }
+
+    const Instruction *op = cpu_execute(cpu, bus);
+
+    int cycles = (int) (op->cycles + cpu->step);
+
+    cpu->step = 0;
+
+    return cycles;
 }
 
 /* ----------------------------------------------------------------------------
@@ -358,7 +370,7 @@ cpu_step(CPU *cpu, Bus *bus)
  * Flags: - - - -
  * No operation. */
 static void
-nop(CPU *cpu, Bus *bus, const Instruction *op)
+nop(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(cpu);
     UNUSED(bus);
@@ -366,7 +378,7 @@ nop(CPU *cpu, Bus *bus, const Instruction *op)
 }
 
 static void
-halt(CPU *cpu, Bus *bus, const Instruction *op)
+halt(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -378,7 +390,7 @@ halt(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z - 0 C
  * Decimal adjust register A. */
 static void
-daa(CPU *cpu, Bus *bus, const Instruction *op)
+daa(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -386,11 +398,13 @@ daa(CPU *cpu, Bus *bus, const Instruction *op)
     uint8_t a = cpu->a;
     uint8_t correction = cpu->flags.carry ? 0x60 : 0x00;
 
-    if (cpu->flags.half_carry || (!cpu->flags.negative && (a&0xF) > 9))
+    if (cpu->flags.half_carry || (!cpu->flags.negative && (a&0xF) > 9)) {
         correction |= 0x06;
+    }
 
-    if (cpu->flags.carry || (!cpu->flags.negative && a > 0x99))
+    if (cpu->flags.carry || (!cpu->flags.negative && a > 0x99)) {
         correction |= 0x60;
+    }
 
     if (cpu->flags.negative) {
         a -= correction;
@@ -409,7 +423,7 @@ daa(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - 1 1 -
  * Complement A register. */
 static void
-cpl(CPU *cpu, Bus *bus, const Instruction *op)
+cpl(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -423,7 +437,7 @@ cpl(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - 0 0 1
  * Set carry flag. */
 static void
-scf(CPU *cpu, Bus *bus, const Instruction *op)
+scf(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -437,7 +451,7 @@ scf(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - 0 0 C
  * Complement carry flag. */
 static void
-ccf(CPU *cpu, Bus *bus, const Instruction *op)
+ccf(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -451,7 +465,7 @@ ccf(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Load 8-bit register or memory location into another 8-bit register or memory location. */
 static void
-ld8(CPU *cpu, Bus *bus, const Instruction *op)
+ld8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg2);
     cpu_set_operand(cpu, bus, op->arg1, v);
@@ -461,17 +475,38 @@ ld8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Load 16-bit data into 16-bit register. */
 static void
-ld16(CPU *cpu, Bus *bus, const Instruction *op)
+ld16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg2);
     cpu_set_operand(cpu, bus, op->arg1, v);
+}
+
+/* LD HL,SP+s8
+ * Flags: 0 0 H C
+ * Load SP + signed 8-bit immediate into HL. */
+static void
+ld_hl_sp(CPU *cpu, MMU *bus, const Instruction *op)
+{
+    int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
+    uint16_t sp = cpu->sp;
+
+    int32_t sum = (int32_t) sp + (int32_t) v;
+    uint8_t half_sum = (sp&0xF) + (v&0xF);
+    uint16_t r = (uint16_t) sum;
+
+    cpu->flags.zero = 0;
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = half_sum > 0xF;
+    cpu->flags.carry = sum > 0xFF;
+
+    cpu->hl = r;
 }
 
 /* INC r8
  * Flags: Z 0 H -
  * Increment 8-bit register or memory location. */
 static void
-inc8(CPU *cpu, Bus *bus, const Instruction *op)
+inc8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
 
@@ -489,7 +524,7 @@ inc8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Increment 16-bit register. */
 static void
-inc16(CPU *cpu, Bus *bus, const Instruction *op)
+inc16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg1);
     uint16_t r = v + 1;
@@ -501,7 +536,7 @@ inc16(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 1 H -
  * Decrement 8-bit register or memory location. */
 static void
-dec8(CPU *cpu, Bus *bus, const Instruction *op)
+dec8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = v - 1;
@@ -519,7 +554,7 @@ dec8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Decrement 16-bit register. */
 static void
-dec16(CPU *cpu, Bus *bus, const Instruction *op)
+dec16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg1);
     uint16_t r = v - 1;
@@ -531,7 +566,7 @@ dec16(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 H C
  * Add 8-bit register or memory location to A. */
 static void
-add_a(CPU *cpu, Bus *bus, const Instruction *op)
+add_a(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -552,7 +587,7 @@ add_a(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - 0 H C
  * Add 16-bit register to HL. */
 static void
-add_hl(CPU *cpu, Bus *bus, const Instruction *op)
+add_hl(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg1);
     uint16_t hl = cpu->hl;
@@ -572,7 +607,7 @@ add_hl(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: 0 0 H C
  * Add 8-bit signed immediate to SP. */
 static void
-add_sp(CPU *cpu, Bus *bus, const Instruction *op)
+add_sp(CPU *cpu, MMU *bus, const Instruction *op)
 {
     int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t sp = cpu->sp;
@@ -593,7 +628,7 @@ add_sp(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 H C
  * Add 8-bit register or memory location and carry flag to A. */
 static void
-adc8(CPU *cpu, Bus *bus, const Instruction *op)
+adc8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
@@ -615,7 +650,7 @@ adc8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 1 H C
  * Subtract 8-bit register or memory location from A. */
 static void
-sub8(CPU *cpu, Bus *bus, const Instruction *op)
+sub8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -636,7 +671,7 @@ sub8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 1 H C
  * Subtract 8-bit register or memory location and carry flag from A. */
 static void
-sbc8(CPU *cpu, Bus *bus, const Instruction *op)
+sbc8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
@@ -658,7 +693,7 @@ sbc8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 1 0
  * AND 8-bit register or memory location with A. */
 static void
-and8(CPU *cpu, Bus *bus, const Instruction *op)
+and8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -676,7 +711,7 @@ and8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 16-bit address provided by immediate operand or register. */
 static void
-jp16(CPU *cpu, Bus *bus, const Instruction *op)
+jp16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
     cpu->pc = addr;
@@ -686,14 +721,14 @@ jp16(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 16-bit address provided by immediate operand or register if F flag is set. */
 static void
-jp16_if(CPU *cpu, Bus *bus, const Instruction *op)
+jp16_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
         cpu->pc = addr;
-        cpu->remaining += 1;
+        cpu->step += 1;
     }
 }
 
@@ -701,14 +736,14 @@ jp16_if(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 16-bit address provided by immediate operand or register if F flag is not set. */
 static void
-jp16_ifn(CPU *cpu, Bus *bus, const Instruction *op)
+jp16_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
         cpu->pc = addr;
-        cpu->remaining += 1;
+        cpu->step += 1;
     }
 }
 
@@ -716,7 +751,7 @@ jp16_ifn(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 8-bit signed offset. */
 static void
-jr8(CPU *cpu, Bus *bus, const Instruction *op)
+jr8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
     cpu->pc += offset;
@@ -726,14 +761,14 @@ jr8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 8-bit signed offset if F flag is set. */
 static void
-jr8_if(CPU *cpu, Bus *bus, const Instruction *op)
+jr8_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
         cpu->pc += offset;
-        cpu->remaining += 1;
+        cpu->step += 1;
     }
 }
 
@@ -741,14 +776,14 @@ jr8_if(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Jump to 8-bit signed offset if F flag is not set. */
 static void
-jr8_ifn(CPU *cpu, Bus *bus, const Instruction *op)
+jr8_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
         cpu->pc += offset;
-        cpu->remaining += 1;
+        cpu->step += 1;
     }
 }
 
@@ -756,7 +791,7 @@ jr8_ifn(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 0
  * XOR 8-bit register or memory location with A. */
 static void
-xor8(CPU *cpu, Bus *bus, const Instruction *op)
+xor8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -774,7 +809,7 @@ xor8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 0
  * OR 8-bit register or memory location with A. */
 static void
-or8(CPU *cpu, Bus *bus, const Instruction *op)
+or8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -792,7 +827,7 @@ or8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 1 H C
  * Compare 8-bit register or memory location with A. */
 static void
-cp8(CPU *cpu, Bus *bus, const Instruction *op)
+cp8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t a = cpu->a;
@@ -811,7 +846,7 @@ cp8(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Push 16-bit register onto stack. */
 static void
-push16(CPU *cpu, Bus *bus, const Instruction *op)
+push16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg1);
     cpu_push(cpu, bus, v);
@@ -821,7 +856,7 @@ push16(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Pop 16-bit register off stack. */
 static void
-pop16(CPU *cpu, Bus *bus, const Instruction *op)
+pop16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_pop(cpu, bus);
 
@@ -835,7 +870,7 @@ pop16(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Call 16-bit address provided by immediate operand or register. */
 static void
-call(CPU *cpu, Bus *bus, const Instruction *op)
+call(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
     cpu_push(cpu, bus, cpu->pc);
@@ -846,14 +881,14 @@ call(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Call 16-bit address provided by immediate operand or register if F flag is set. */
 static void
-call_if(CPU *cpu, Bus *bus, const Instruction *op)
+call_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
         cpu_push(cpu, bus, cpu->pc);
-        cpu->remaining += 3;
+        cpu->step += 3;
         cpu->pc = addr;
     }
 }
@@ -862,14 +897,14 @@ call_if(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Call 16-bit address provided by immediate operand or register if F flag is not set. */
 static void
-call_ifn(CPU *cpu, Bus *bus, const Instruction *op)
+call_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
         cpu_push(cpu, bus, cpu->pc);
-        cpu->remaining += 3;
+        cpu->step += 3;
         cpu->pc = addr;
     }
 }
@@ -878,7 +913,7 @@ call_ifn(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Return from subroutine. */
 static void
-ret(CPU *cpu, Bus *bus, const Instruction *op)
+ret(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -890,13 +925,13 @@ ret(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Return from subroutine if F flag is set. */
 static void
-ret_if(CPU *cpu, Bus *bus, const Instruction *op)
+ret_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
 
     if (flag) {
         cpu->pc = cpu_pop(cpu, bus);
-        cpu->remaining += 3;
+        cpu->step += 3;
     }
 }
 
@@ -904,13 +939,13 @@ ret_if(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Return from subroutine if F flag is not set. */
 static void
-ret_ifn(CPU *cpu, Bus *bus, const Instruction *op)
+ret_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
 
     if (!flag) {
         cpu->pc = cpu_pop(cpu, bus);
-        cpu->remaining += 3;
+        cpu->step += 3;
     }
 }
 
@@ -918,13 +953,14 @@ ret_ifn(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Return from subroutine and enable interrupts. */
 static void
-reti(CPU *cpu, Bus *bus, const Instruction *op)
+reti(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
 
     cpu->pc = cpu_pop(cpu, bus);
     cpu->ime = 1; // looks like not delayed unlike EI
+    cpu->ime_delay = -1;
 }
 
 /* RST n
@@ -932,19 +968,18 @@ reti(CPU *cpu, Bus *bus, const Instruction *op)
  * Push present address onto stack and jump to address $0000 + n,
  * where n is one of $00, $08, $10, $18, $20, $28, $30, $38. */
 static void
-rst(CPU *cpu, Bus *bus, const Instruction *op)
+rst(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
     cpu_push(cpu, bus, cpu->pc);
     cpu->pc = addr;
 }
 
-/* RLCA
- * RLC r8
+/* RLC r8
  * Flags: Z 0 0 C
  * Rotate register left. */
 static void
-rlc(CPU *cpu, Bus *bus, const Instruction *op)
+rlc(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) (v << 1) | (v >> 7);
@@ -961,7 +996,7 @@ rlc(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: 0 0 0 C
  * Rotate register A left through carry flag. */
 static void
-rla(CPU *cpu, Bus *bus, const Instruction *op)
+rla(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v << 1) | cpu->flags.carry);
@@ -978,7 +1013,7 @@ rla(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Rotate register left through carry flag. */
 static void
-rl(CPU *cpu, Bus *bus, const Instruction *op)
+rl(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v << 1) | cpu->flags.carry);
@@ -991,11 +1026,28 @@ rl(CPU *cpu, Bus *bus, const Instruction *op)
     cpu_set_operand(cpu, bus, op->arg1, r);
 }
 
+/* RLCA
+ * Flags: 0 0 0 C
+ * Rotate register left. */
+static void
+rlca(CPU *cpu, MMU *bus, const Instruction *op)
+{
+    uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
+    uint8_t r = (uint8_t) (v << 1) | (v >> 7);
+
+    cpu->flags.zero = 0;
+    cpu->flags.negative = 0;
+    cpu->flags.half_carry = 0;
+    cpu->flags.carry = (v >> 7) & 1;
+
+    cpu_set_operand(cpu, bus, op->arg1, r);
+}
+
 /* RRCA
  * Flags: 0 0 0 C
  * Rotate register right. */
 static void
-rrca(CPU *cpu, Bus *bus, const Instruction *op)
+rrca(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v >> 1) | (v << 7));
@@ -1012,7 +1064,7 @@ rrca(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Rotate register right. */
 static void
-rrc(CPU *cpu, Bus *bus, const Instruction *op)
+rrc(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v >> 1) | (v << 7));
@@ -1029,7 +1081,7 @@ rrc(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: 0 0 0 C
  * Rotate register A right through carry flag. */
 static void
-rra(CPU *cpu, Bus *bus, const Instruction *op)
+rra(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v >> 1) | (cpu->flags.carry << 7));
@@ -1047,7 +1099,7 @@ rra(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Rotate register right through carry flag. */
 static void
-rr(CPU *cpu, Bus *bus, const Instruction *op)
+rr(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) ((v >> 1) | (cpu->flags.carry << 7));
@@ -1064,7 +1116,7 @@ rr(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Shift register left into carry. */
 static void
-sla(CPU *cpu, Bus *bus, const Instruction *op)
+sla(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (uint8_t) (v << 1);
@@ -1081,7 +1133,7 @@ sla(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Shift register right into carry. MSB is unchanged. */
 static void
-sra(CPU *cpu, Bus *bus, const Instruction *op)
+sra(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = (v >> 1) | (v & 0x80);
@@ -1098,7 +1150,7 @@ sra(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 C
  * Shift register right into carry. MSB is set to 0. C flag is old LSB. */
 static void
-srl(CPU *cpu, Bus *bus, const Instruction *op)
+srl(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t r = v >> 1;
@@ -1115,7 +1167,7 @@ srl(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Disable interrupts. */
 static void
-di(CPU *cpu, Bus *bus, const Instruction *op)
+di(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -1127,7 +1179,7 @@ di(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Enable interrupts. */
 static void
-ei(CPU *cpu, Bus *bus, const Instruction *op)
+ei(CPU *cpu, MMU *bus, const Instruction *op)
 {
     UNUSED(bus);
     UNUSED(op);
@@ -1139,7 +1191,7 @@ ei(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 0 0
  * Swap upper and lower nibbles of register. */
 static void
-swap(CPU *cpu, Bus *bus, const Instruction *op)
+swap(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t l = (uint8_t) ((v & 0x0F) << 4);
@@ -1158,7 +1210,7 @@ swap(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: Z 0 1 -
  * Test bit b in 8-bit register or memory location. */
 static void
-bit(CPU *cpu, Bus *bus, const Instruction *op)
+bit(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t bit = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t v = cpu_getbit(cpu, bus, op->arg2, bit);
@@ -1172,7 +1224,7 @@ bit(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Set bit b in 8-bit register or memory location. */
 static void
-set(CPU *cpu, Bus *bus, const Instruction *op)
+set(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t bit = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     cpu_setbit(cpu, bus, op->arg2, bit, 1);
@@ -1182,7 +1234,7 @@ set(CPU *cpu, Bus *bus, const Instruction *op)
  * Flags: - - - -
  * Reset bit b in 8-bit register or memory location. */
 static void
-res(CPU *cpu, Bus *bus, const Instruction *op)
+res(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t bit = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     cpu_setbit(cpu, bus, op->arg2, bit, 0);
@@ -1325,6 +1377,7 @@ const Instruction opcodes[256] = {
     OPCODE(0x31, ARG_REG_SP, ARG_IMM16, ld16, 3, "LD SP,$%04X"),
     OPCODE(0x08, ARG_IND_IMM16, ARG_REG_SP, ld16, 5, "LD ($%04X),SP"),
     OPCODE(0xF9, ARG_REG_SP, ARG_REG_HL, ld16, 2, "LD SP,HL"),
+    OPCODE(0xF8, ARG_IMM8, ARG_NONE, ld_hl_sp, 3, "LD HL,SP+$%02X"),
 
     OPCODE(0x80, ARG_REG_B, ARG_NONE, add_a, 1, "ADD A,B"),
     OPCODE(0x81, ARG_REG_C, ARG_NONE, add_a, 1, "ADD A,C"),
@@ -1457,7 +1510,7 @@ const Instruction opcodes[256] = {
     OPCODE(0xF7, ARG_RST_6, ARG_NONE, rst, 4, "RST 6"),
     OPCODE(0xFF, ARG_RST_7, ARG_NONE, rst, 4, "RST 7"),
 
-    OPCODE(0x07, ARG_REG_A, ARG_NONE, rlc, 1, "RLCA"),
+    OPCODE(0x07, ARG_REG_A, ARG_NONE, rlca, 1, "RLCA"),
     OPCODE(0x17, ARG_REG_A, ARG_NONE, rla, 1, "RLA"),
     OPCODE(0x0F, ARG_REG_A, ARG_NONE, rrca, 1, "RRCA"),
     OPCODE(0x1F, ARG_REG_A, ARG_NONE, rra, 1, "RRA"),

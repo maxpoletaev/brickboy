@@ -16,7 +16,7 @@ ROM_BASENAME=$(basename "$ROM_FILE")
 echo "Testing ${ROM_BASENAME} (timeout: $TIMEOUT)"
 
 # Run the emulator and compare the CPU state log with the golden log.
-timeout $TIMEOUT $BRICKBOY_BIN --nologo --statelog="${STATE_LOG}" --debuglog="${DEBUG_LOG}" --serial "${ROM_FILE}"
+timeout $TIMEOUT $BRICKBOY_BIN --nologo --state="${STATE_LOG}" --debug="${DEBUG_LOG}" "${ROM_FILE}"
 LINECMP_RESULT=$(./scripts/linecmp.py --lineno "$GOLDEN_LOG" "$STATE_LOG")
 LINECMP_EXIT_CODE=$?
 
@@ -32,7 +32,7 @@ echo "$LINECMP_RESULT"
 LINE_NUMBER=$(echo "$LINECMP_RESULT" | tail -n 1)
 
 START_LINE=$(($LINE_NUMBER - 10))
-END_LINE=$(($LINE_NUMBER))
+END_LINE=$(($LINE_NUMBER + 2))
 
 if [[ $START_LINE -lt 1 ]]; then
     START_LINE=1

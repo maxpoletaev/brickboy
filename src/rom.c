@@ -4,9 +4,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "shared.h"
+#include "common.h"
 #include "rom.h"
-
 
 static int
 rom_load(ROM *rom, FILE *file, uint32_t file_size)
@@ -16,27 +15,18 @@ rom_load(ROM *rom, FILE *file, uint32_t file_size)
         return RET_ERR;
     }
 
-    uint8_t *data = calloc(1, file_size);
-    if (data == NULL) {
-        TRACE("failed to allocate rom data (%d bytes)", file_size);
-        goto error;
-    }
-
+    uint8_t *data = must_alloc(file_size);
     if (fread(data, file_size, 1, file) != 1) {
         TRACE("failed to read rom data");
-        goto error;
+        free(data);
+        return RET_ERR;
     }
 
-    // Header is mapped directly into the rom data at 0x0100.
     rom->header = (ROMHeader *) (data + 0x0100);
     rom->size = file_size;
     rom->data = data;
 
     return RET_OK;
-
-error:
-    free(data);
-    return RET_ERR;
 }
 
 int
@@ -66,18 +56,15 @@ rom_open(ROM *rom, const char *filename)
     }
 
 cleanup:
+
     fclose(file);
     file = NULL;
-
     return ret;
 }
 
 void
 rom_free(ROM *rom)
 {
-    if (rom->data == NULL)
-        return;
-
     free(rom->data);
     rom->header = NULL;
     rom->data = NULL;

@@ -2,44 +2,29 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include "shared.h"
+#include "common.h"
 #include "mapper.h"
 #include "rom.h"
 #include "mbc0.h"
 
-static const MapperVT *mapper_vtables[256] = {
-    [0x00] = &mbc0_vtable,
-    [0x01] = &mbc0_vtable,
-};
-
-static const char *mapper_names[256] = {
-    [0x00] = "ROM",
-    [0x01] = "ROM+MBC1",
-};
-
 int
 mapper_init(Mapper *mapper, ROM *rom)
 {
-    uint8_t mapper_id = rom->header->cartridge_type;
-    const MapperVT *vt = mapper_vtables[mapper_id];
-    const char *name = mapper_names[mapper_id];
-
-    if (vt == NULL || name == NULL) {
-        TRACE("unsupported mapper: %02X", mapper_id);
+    switch (rom->header->type) {
+    case 0x00:
+    case 0x01: // TODO: implement MBC1
+        mapper->impl = must_alloc(sizeof(MBC0));
+        mapper->vt = &mbc0_vtable;
+        mapper->name = "ROM";
+        mapper->id = 0x00;
+        break;
+    default:
+        TRACE("unknown cartridge type: %d", rom->header->type);
         return RET_ERR;
     }
 
-    mapper->impl = NULL;
-    assert(vt->init != NULL);
-    int ret = vt->init(mapper, rom);
-
-    if (ret == RET_OK) {
-        mapper->vt = vt;
-        mapper->name = name;
-        assert(mapper->impl != NULL); // set by init
-    }
-
-    return ret;
+    assert(mapper->vt->init != NULL);
+    return mapper->vt->init(mapper, rom);
 }
 
 inline void
@@ -66,13 +51,10 @@ mapper_reset(Mapper *mapper)
 inline void
 mapper_free(Mapper *mapper)
 {
-    if (mapper->vt == NULL)
-        return;
-
+    assert(mapper->vt != NULL);
     assert(mapper->vt->free != NULL);
-    mapper->vt->free(mapper);
 
-    assert(mapper->impl == NULL); // nulled by vt->free
-    mapper->name = NULL;
-    mapper->vt = NULL;
+    mapper->vt->free(mapper);
+    free(mapper->impl);
+    mapper->impl = NULL;
 }

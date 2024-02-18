@@ -3,15 +3,16 @@
 
 #include <stdint.h>
 
-#include "bus.h"
+#include "common.h"
+#include "mmu.h"
 
 typedef struct {
-    uint8_t unused : 4;
+    uint8_t unused_ : 4;
     uint8_t carry : 1;
     uint8_t half_carry : 1;
     uint8_t negative : 1;
     uint8_t zero : 1;
-} CPUFlags;
+} PACKED CPUFlags;
 
 typedef struct CPU {
     // AF register
@@ -58,9 +59,9 @@ typedef struct CPU {
     uint8_t ime;
     uint8_t halted;
 
+    uint8_t step;
     uint64_t cycle;
     int8_t ime_delay;
-    uint8_t remaining;
 } CPU;
 
 typedef enum {
@@ -123,23 +124,11 @@ typedef enum {
     ARG_RST_7, // $38
 } Operand;
 
-typedef enum {
-    INTERRUPT_VBLANK = 0,
-    INTERRUPT_LCDSTAT = 1,
-    INTERRUPT_TIMER = 2,
-    INTERRUPT_SERIAL = 3,
-    INTERRUPT_JOYPAD = 4,
-} Interrupt;
-
 typedef struct Instruction Instruction;
 
-typedef struct Bus Bus;
+typedef struct MMU Bus;
 
-typedef void (*Handler)(
-    CPU *cpu,
-    Bus *bus,
-    const Instruction *instr
-);
+typedef void (*Handler)(CPU *cpu, MMU *bus, const Instruction *instr);
 
 struct Instruction {
     uint8_t opcode;
@@ -152,11 +141,13 @@ struct Instruction {
 
 void cpu_reset(CPU *cpu);
 
-void cpu_step(CPU *cpu, Bus *bus);
+void cpu_step(CPU *cpu, MMU *bus);
 
-void cpu_interrupt(CPU *cpu, Bus *bus, Interrupt interrupt);
+int cpu_step_fast(CPU *cpu, MMU *bus);
 
-const Instruction *cpu_decode(Bus *bus, uint16_t pc);
+bool cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc);
+
+const Instruction *cpu_decode(MMU *bus, uint16_t pc);
 
 const Instruction opcodes[256];
 

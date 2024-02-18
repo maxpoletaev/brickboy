@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -6,11 +7,14 @@
 #include <errno.h>
 #include <getopt.h>
 #include <string.h>
+#include <assert.h>
 
-#include "shared.h"
+#include "common.h"
 #include "mapper.h"
 #include "disasm.h"
-#include "bus.h"
+#include "serial.h"
+#include "timer.h"
+#include "mmu.h"
 #include "cpu.h"
 #include "rom.h"
 
@@ -45,7 +49,7 @@ print_usage(void)
 static void
 print_help(void)
 {
-    printf("BrickBoy %s (%s)\n", BUILD_VERSION, BUILD_COMMIT_HASH);
+    printf("BrickBoy\n");
     printf("\n");
 
     print_usage();
@@ -56,20 +60,20 @@ print_help(void)
     printf("\n");
 
     printf("Debug Options:\n");
-    printf("  -d, --debug <romfile>    Enable debug mode (disassemble each instruction before executing it)\n");
-    printf("  -l, --state <romfile>    Enable state log mode (log CPU state after each instruction)\n");
+    printf("  -d, --debug <debug_out>  Enable debug mode (disassemble each instruction before executing it)\n");
+    printf("  -l, --state <state_out>  Enable state log mode (log CPU state after each instruction)\n");
     printf("  --breakpoint <AAAA>      Set breakpoint to $AAAA. Exit when PC reaches this address\n");
-    printf("  --print-serial           Print serial output to stdout\n");
+    printf("  --debug-serial           Print serial output to stdout\n");
     printf("  --slow                   Slow down the emulation speed\n");
 }
 
 static const struct option longopts[] = {
     {"help", no_argument, NULL, 'h'},
 
-    {"debuglog", required_argument, NULL, 'd'},
-    {"statelog", required_argument, NULL, 'l'},
+    {"debug", required_argument, NULL, 'd'},
+    {"state", required_argument, NULL, 'l'},
     {"breakpoint", required_argument, NULL, 'b'},
-    {"serial", no_argument, NULL, 0},
+    {"debug-serial", no_argument, NULL, 0},
     {"nologo", no_argument, NULL, 0},
     {"slow", no_argument, NULL, 0},
 
@@ -96,7 +100,7 @@ args_parse(int argc, char **argv)
                 continue;
             }
 
-            if (strcmp(name, "serial") == 0) {
+            if (strcmp(name, "debug-serial") == 0) {
                 opts.print_serial = true;
                 continue;
             }
@@ -158,140 +162,161 @@ args_parse(int argc, char **argv)
 static FILE*
 output_file(const char *filename)
 {
-    if (strcmp(filename, "-") == 0)
+    if (strcmp(filename, "-") == 0) {
         return stdout;
+    }
 
     return fopen(filename, "w");
 }
 
 
 static inline void
-print_state(CPU *cpu, Bus *bus, FILE *out)
+print_state(CPU *cpu, MMU *bus, FILE *out)
 {
     fprintf(out, "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X",
             cpu->a, cpu->f, cpu->b, cpu->c, cpu->d, cpu->e, cpu->h, cpu->l, cpu->sp, cpu->pc);
 
     uint8_t bytes[4] = {
-        bus_read(bus, cpu->pc),
-        bus_read(bus, cpu->pc + 1),
-        bus_read(bus, cpu->pc + 2),
-        bus_read(bus, cpu->pc + 3),
+        mmu_read(bus, cpu->pc),
+        mmu_read(bus, cpu->pc + 1),
+        mmu_read(bus, cpu->pc + 2),
+        mmu_read(bus, cpu->pc + 3),
     };
 
     fprintf(out, " (%02X %02X %02X %02X)\n", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-#define MAIN_EXIT(code, fmt, ...) \
-    do {                             \
-        LOG(fmt, ##__VA_ARGS__);  \
-        exit_code = code;            \
-        goto cleanup;                \
-    } while (0)
+static bool inline
+handle_interrupts(MMU *bus, CPU *cpu)
+{
+    static const uint8_t mask[] =  {INT_VBLANK, INT_LCD_STAT, INT_TIMER, INT_SERIAL, INT_JOYPAD};
+    static const uint16_t addr[] = {0x0040, 0x0048, 0x0050, 0x0058, 0x0060};
+    static_assert(ARRAY_SIZE(mask) == ARRAY_SIZE(addr), "");
+
+    if (bus->intf == 0 || bus->inte == 0) {
+        return false;
+    }
+
+    for (size_t i = 0; i < ARRAY_SIZE(mask); i++) {
+        if ((bus->intf & mask[i]) && (bus->inte & mask[i])) {
+            if (!cpu_interrupt(cpu, bus, addr[i])) {
+                return false;
+            }
+
+            bus->intf &= ~mask[i];
+            return true;
+        }
+    }
+
+    return false;
+}
 
 int
 main(int argc, char **argv)
 {
     args_parse(argc, argv);
 
-    if (!opts.no_logo)
+    if (!opts.no_logo) {
         print_logo();
+    }
 
     int exit_code = 0;
     FILE *debug_out = NULL;
     FILE *state_out = NULL;
 
-    Mapper mapper;
-    ROM rom;
-    Bus bus;
-    CPU cpu;
 
     if (opts.debug_out != NULL) {
         debug_out = output_file(opts.debug_out);
-        if (debug_out == NULL)
-            MAIN_EXIT(1, "failed to open debug output file: %s", opts.debug_out);
+
+        if (debug_out == NULL) {
+            LOG("failed to open debug output file: %s", opts.debug_out);
+            exit(1);
+        }
     }
 
     if (opts.state_out != NULL) {
         state_out = output_file(opts.state_out);
 
-        if (state_out == NULL)
-            MAIN_EXIT(1, "failed to open state output file: %s", opts.state_out);
+        if (state_out == NULL) {
+            LOG("failed to open state output file: %s", opts.state_out);
+            exit(1);
+        }
     }
 
-    if (access(opts.romfile, R_OK) != 0) // NOLINT(misc-include-cleaner): R_OK is defined in unistd.h
-        MAIN_EXIT(1, "file not found: %s", opts.romfile);
+    if (access(opts.romfile, R_OK) != 0) { // NOLINT(misc-include-cleaner): R_OK is defined in unistd.h
+        LOG("file not found: %s", opts.romfile);
+        exit(1);
+    }
 
-    if (rom_open(&rom, opts.romfile) != RET_OK)
-        MAIN_EXIT(1, "failed to open rom file");
-
-    if (mapper_init(&mapper, &rom) != RET_OK)
-        MAIN_EXIT(1, "failed to initialize mapper");
+    ROM rom = {0};
+    if (rom_open(&rom, opts.romfile) != RET_OK) {
+        LOG("failed to open rom file");
+        exit(1);
+    }
 
     char *title = to_cstring(rom.header->title, sizeof(rom.header->title));
-    LOG("rom loaded: %s (%s)", title, mapper.name);
+    LOG("rom loaded: %s", title);
     free(title);
 
-    bus.mapper = &mapper;
-    bus_reset(&bus);
-    cpu_reset(&cpu);
-
-    if (opts.print_serial)
-        LOG("printing serial output is enabled");
-
-    if (opts.breakpoint != 0)
-        LOG("breakpoint set to 0x%04X", opts.breakpoint);
-
-    while (1) {
-        if (cpu.remaining == 0) {
-            if (debug_out != NULL)
-                disasm_step(&bus, &cpu, debug_out);
-            if (state_out != NULL)
-                print_state(&cpu, &bus, state_out);
-
-            if (bus.ie_bits.vblank && bus.if_bits.vblank) {
-                cpu_interrupt(&cpu, &bus, INTERRUPT_VBLANK);
-                bus.if_bits.vblank = 0;
-            } else if (bus.ie_bits.lcd_stat && bus.if_bits.lcd_stat) {
-                cpu_interrupt(&cpu, &bus, INTERRUPT_LCDSTAT);
-                bus.if_bits.lcd_stat = 0;
-            } else if (bus.ie_bits.timer && bus.if_bits.timer) {
-                cpu_interrupt(&cpu, &bus, INTERRUPT_TIMER);
-                bus.if_bits.timer = 0;
-            } else if (bus.ie_bits.serial && bus.if_bits.serial) {
-                cpu_interrupt(&cpu, &bus, INTERRUPT_SERIAL);
-                bus.if_bits.serial = 0;
-            } else if (bus.ie_bits.joypad && bus.if_bits.joypad) {
-                cpu_interrupt(&cpu, &bus, INTERRUPT_JOYPAD);
-                bus.if_bits.joypad = 0;
-            }
-        }
-
-        cpu_step(&cpu, &bus);
-
-        if (bus.sc == 0x81 && opts.print_serial) {
-            fputc(bus.sb, stdout);
-            bus.sc = 0x01;
-            fflush(stdout);
-        }
-
-        if (opts.breakpoint > 0 && cpu.pc == opts.breakpoint) {
-            LOG("breakpoint reached at 0x%04X\n", cpu.pc);
-            break;
-        }
-
-        if (opts.slow)
-            usleep(1000);
+    Mapper mapper = {0};
+    if (mapper_init(&mapper, &rom) != RET_OK) {
+        LOG("failed to initialize mapper");
+        exit(1);
     }
 
-cleanup:
+    MMU mmu = {0};
+    mmu.mapper = &mapper;
+    mmu_reset(&mmu);
+
+    CPU cpu = {0};
+    cpu_reset(&cpu);
+
+    if (opts.print_serial) {
+        LOG("printing serial output is enabled");
+    }
+
+    if (opts.breakpoint != 0) {
+        LOG("breakpoint set to 0x%04X", opts.breakpoint);
+    }
+
+    while (1) {
+        if (debug_out != NULL) {
+            disasm_step(&mmu, &cpu, debug_out);
+        }
+
+        if (state_out != NULL) {
+            print_state(&cpu, &mmu, state_out);
+        }
+
+        int cycles = cpu_step_fast(&cpu, &mmu);
+
+        timer_step_fast(&mmu.timer, cycles);
+
+        if (mmu.timer.interrupt) {
+            mmu.intf |= INT_TIMER;
+            mmu.timer.interrupt = false;
+        }
+
+        serial_print(&mmu.serial);
+        handle_interrupts(&mmu, &cpu);
+
+        if (opts.breakpoint && cpu.pc == opts.breakpoint) {
+            LOG("breakpoint reached at 0x%04X", opts.breakpoint);
+            break;
+        }
+    }
+
     mapper_free(&mapper);
+
     rom_free(&rom);
 
-    if (debug_out != NULL && debug_out != stdout)
+    if (debug_out != NULL && debug_out != stdout) {
         fclose(debug_out);
-    if (state_out != NULL && state_out != stdout)
-        fclose(state_out);
+    }
 
+    if (state_out != NULL && state_out != stdout) {
+        fclose(state_out);
+    }
 
     return exit_code;
 }

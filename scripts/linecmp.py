@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os.path
 from collections import deque
 import argparse
 import gzip
@@ -57,9 +57,17 @@ def compare(args: Args) -> bool:
                 print(prev_line)
 
             print()
-            print(f'mismatch in line {lineno+skip1} ({lineno+skip2}):')
-            print(line1)
-            print(line2)
+            print(f'mismatch in line {lineno+skip1}:')
+            maxlen = max(len(line1), len(line2))
+
+            label1 = os.path.basename(filename1)
+            label2 = os.path.basename(filename2)
+            if label1 == label2:
+                label1 = filename1
+                label2 = filename2
+
+            print(f'{line1.ljust(maxlen)} <- {label1}:{lineno+skip1}')
+            print(f'{line2.ljust(maxlen)} <- {label2}:{lineno+skip2}')
             print(find_position(line1, line2))
 
             if args.lineno:

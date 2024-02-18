@@ -1,11 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include "mbc0.h"
+
 #include <stdint.h>
 
-#include "shared.h"
+#include "common.h"
 #include "mapper.h"
 #include "rom.h"
-#include "mbc0.h"
 
 const MapperVT mbc0_vtable = {
     .init = mbc0_init,
@@ -24,14 +23,8 @@ mbc0_impl(Mapper *mapper)
 int
 mbc0_init(Mapper *mapper, ROM *rom)
 {
-    MBC0 *impl = calloc(1, sizeof(MBC0));
-    if (impl == NULL) {
-        TRACE("failed to allocate memory");
-        return RET_ERR;
-    }
-
+    MBC0 *impl = mbc0_impl(mapper);
     impl->rom = rom;
-    mapper->impl = impl;
 
     return RET_OK;
 }
@@ -39,8 +32,7 @@ mbc0_init(Mapper *mapper, ROM *rom)
 void
 mbc0_free(Mapper *mapper)
 {
-    free(mapper->impl);
-    mapper->impl = NULL;
+    UNUSED(mapper);
 }
 
 void
@@ -54,8 +46,9 @@ mbc0_read(Mapper *mapper, uint16_t addr)
 {
     MBC0 *impl = mbc0_impl(mapper);
 
-    if (addr >= impl->rom->size)
+    if (addr >= impl->rom->size) {
         PANIC("out of bounds read at 0x%04X", addr);
+    }
 
     return impl->rom->data[addr];
 }
@@ -65,8 +58,9 @@ mbc0_write(Mapper *mapper, uint16_t addr, uint8_t data)
 {
     MBC0 *impl = mbc0_impl(mapper);
 
-    if (addr >= impl->rom->size)
+    if (addr >= impl->rom->size) {
         PANIC("out of bounds write at 0x%04X", addr);
+    }
 
     impl->rom->data[addr] = data;
 }
