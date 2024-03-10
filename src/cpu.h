@@ -1,75 +1,82 @@
-#ifndef BRICKBOY_CPU_H
-#define BRICKBOY_CPU_H
+#pragma once
 
 #include <stdint.h>
 
 #include "common.h"
 #include "mmu.h"
 
-typedef struct {
-    uint8_t unused_ : 4;
+typedef enum {
+    INT_VBLANK = (1 << 0),
+    INT_LCD_STAT = (1 << 1),
+    INT_TIMER = (1 << 2),
+    INT_SERIAL = (1 << 3),
+    INT_JOYPAD = (1 << 4),
+} Interrupt;
+
+typedef struct CPUFlags {
+    uint8_t _unused_ : 4;
     uint8_t carry : 1;
     uint8_t half_carry : 1;
     uint8_t negative : 1;
     uint8_t zero : 1;
-} PACKED CPUFlags;
+} _packed_ CPUFlags;
 
 typedef struct CPU {
     // AF register
     union {
-        uint16_t af;
+        uint16_t AF;
         struct {
             union {
                 CPUFlags flags;
-                uint8_t f;
+                uint8_t F;
             };
-            uint8_t a;
-        };
+            uint8_t A;
+        } _packed_;
     };
 
     // BC register
     union {
-        uint16_t bc;
+        uint16_t BC;
         struct {
-            uint8_t c;
-            uint8_t b;
-        };
+            uint8_t C;
+            uint8_t B;
+        } _packed_;
     };
 
     // DE register
     union {
-        uint16_t de;
+        uint16_t DE;
         struct {
-            uint8_t e;
-            uint8_t d;
-        };
+            uint8_t E;
+            uint8_t D;
+        } _packed_;
     };
 
     // HL register
     union {
-        uint16_t hl;
+        uint16_t HL;
         struct {
-            uint8_t l;
-            uint8_t h;
-        };
+            uint8_t L;
+            uint8_t H;
+        } _packed_;
     };
 
-    uint16_t sp;
-    uint16_t pc;
-    uint8_t ime;
-    uint8_t halted;
+    uint16_t SP;
+    uint16_t PC;
+    uint8_t IME;
 
     uint8_t step;
     uint64_t cycle;
     int8_t ime_delay;
+    uint8_t halted;
 } CPU;
 
 typedef enum {
     ARG_NONE = 0,
 
     // immediate values
-    ARG_IMM8,  // $XX
-    ARG_IMM16, // $XXXX
+    ARG_IMM_8,  // $XX
+    ARG_IMM_16, // $XXXX
 
     // 8-bit registers
     ARG_REG_A, // A
@@ -96,8 +103,8 @@ typedef enum {
     ARG_IND_HLD, // (HL-)
 
     // indirect (immediate)
-    ARG_IND_IMM8,  // ($XX)
-    ARG_IND_IMM16, // ($XXXX)
+    ARG_IND_8,  // ($XX)
+    ARG_IND_16, // ($XXXX)
 
     // cpu flags
     ARG_FLAG_ZERO,
@@ -122,19 +129,19 @@ typedef enum {
     ARG_RST_5, // $28
     ARG_RST_6, // $30
     ARG_RST_7, // $38
-} Operand;
-
-typedef struct Instruction Instruction;
+} ArgType;
 
 typedef struct MMU Bus;
+
+typedef struct Instruction Instruction;
 
 typedef void (*Handler)(CPU *cpu, MMU *bus, const Instruction *instr);
 
 struct Instruction {
     uint8_t opcode;
     uint8_t cycles;
-    Operand arg1;
-    Operand arg2;
+    ArgType arg1;
+    ArgType arg2;
     Handler handler;
     const char *text;
 };
@@ -143,8 +150,6 @@ void cpu_reset(CPU *cpu);
 
 void cpu_step(CPU *cpu, MMU *bus);
 
-int cpu_step_fast(CPU *cpu, MMU *bus);
-
 bool cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc);
 
 const Instruction *cpu_decode(MMU *bus, uint16_t pc);
@@ -152,5 +157,3 @@ const Instruction *cpu_decode(MMU *bus, uint16_t pc);
 const Instruction opcodes[256];
 
 const Instruction cb_opcodes[256];
-
-#endif //BRICKBOY_CPU_H

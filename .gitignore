@@ -1,5 +1,6 @@
 # Compiled objects
-/brickboy
+/build
+/cmake-build-*
 
 # IDE and OS files
 .DS_Store
@@ -8,12 +9,3 @@
 
 # Debug files
 *.dSYM
-
-# Roms
-/roms
-
-# CMake
-Makefile
-cmake-build-*
-cmake_install.cmake
-CMakeCache.txt

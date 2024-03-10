@@ -57,7 +57,7 @@ def compare(args: Args) -> bool:
                 print(prev_line)
 
             print()
-            print(f'mismatch in line {lineno+skip1}:')
+            print(F'mismatch in line {lineno+skip1}:')
             maxlen = max(len(line1), len(line2))
 
             label1 = os.path.basename(filename1)
@@ -66,8 +66,8 @@ def compare(args: Args) -> bool:
                 label1 = filename1
                 label2 = filename2
 
-            print(f'{line1.ljust(maxlen)} <- {label1}:{lineno+skip1}')
-            print(f'{line2.ljust(maxlen)} <- {label2}:{lineno+skip2}')
+            print(F'{line1.ljust(maxlen)} <- {label1}:{lineno+skip1}')
+            print(F'{line2.ljust(maxlen)} <- {label2}:{lineno+skip2}')
             print(find_position(line1, line2))
 
             if args.lineno:

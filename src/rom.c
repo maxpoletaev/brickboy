@@ -15,10 +15,10 @@ rom_load(ROM *rom, FILE *file, uint32_t file_size)
         return RET_ERR;
     }
 
-    uint8_t *data = must_alloc(file_size);
+    uint8_t *data = xalloc(file_size);
     if (fread(data, file_size, 1, file) != 1) {
         TRACE("failed to read rom data");
-        free(data);
+        xfree(data);
         return RET_ERR;
     }
 
@@ -29,13 +29,19 @@ rom_load(ROM *rom, FILE *file, uint32_t file_size)
     return RET_OK;
 }
 
-int
-rom_open(ROM *rom, const char *filename)
+static const char *
+rom_title(ROM *rom)
 {
-    FILE *file = NULL;
-    int ret = RET_OK;
+    static char title[ROM_TITLE_SIZE + 1] = {0};
+    strncpy(title, (char *) rom->header->title, ROM_TITLE_SIZE);
+    title[ROM_TITLE_SIZE] = '\0';
+    return title;
+}
 
-    file = fopen(filename, "rb");
+int
+rom_init(ROM *rom, const char *filename)
+{
+    FILE *file _autoclose_ = fopen(filename, "rb");
     if (file == NULL) {
         TRACE("failed to open file: %s", filename);
         return RET_ERR;
@@ -43,30 +49,24 @@ rom_open(ROM *rom, const char *filename)
 
     struct stat file_info;
     if (stat(filename, &file_info) != 0) {
-        TRACE("failed to stat file: %s", filename);
-        ret = RET_ERR;
-        goto cleanup;
+        TRACE("failed to STAT file: %s", filename);
+        return RET_ERR;
     }
 
     uint32_t file_size = (uint32_t) file_info.st_size;
     if (rom_load(rom, file, file_size) != RET_OK) {
         TRACE("failed to load rom: %s", filename);
-        ret = RET_ERR;
-        goto cleanup;
+        return RET_ERR;
     }
 
-cleanup:
+    const char *title = rom_title(rom);
+    LOG("rom loaded: %s", title);
 
-    fclose(file);
-    file = NULL;
-    return ret;
+    return RET_OK;
 }
 
 void
-rom_free(ROM *rom)
+rom_deinit(ROM *rom)
 {
-    free(rom->data);
-    rom->header = NULL;
-    rom->data = NULL;
-    rom->size = 0;
+    xfree(rom->data);
 }

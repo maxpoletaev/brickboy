@@ -8,14 +8,14 @@
 #include "cpu.h"
 
 static inline int
-arg_size(Operand arg)
+arg_size(ArgType arg)
 {
     switch (arg) {
-    case ARG_IMM8:
-    case ARG_IND_IMM8:
+    case ARG_IMM_8:
+    case ARG_IND_8:
         return 1;
-    case ARG_IMM16:
-    case ARG_IND_IMM16:
+    case ARG_IMM_16:
+    case ARG_IND_16:
         return 2;
     default:
         return 0;
@@ -23,14 +23,14 @@ arg_size(Operand arg)
 }
 
 static inline uint16_t
-arg_value(Operand arg, MMU *mmu, uint16_t pc)
+arg_value(ArgType arg, MMU *mmu, uint16_t pc)
 {
     switch (arg) {
-    case ARG_IMM8:
-    case ARG_IND_IMM8:
+    case ARG_IMM_8:
+    case ARG_IND_8:
         return mmu_read(mmu, pc);
-    case ARG_IMM16:
-    case ARG_IND_IMM16:
+    case ARG_IMM_16:
+    case ARG_IND_16:
         return mmu_read16(mmu, pc);
     default:
         return 0;
@@ -38,41 +38,41 @@ arg_value(Operand arg, MMU *mmu, uint16_t pc)
 }
 
 static inline void
-arg_indirect(Strbuf *str, Operand arg, MMU *mmu, CPU *cpu)
+arg_indirect(Strbuf *str, ArgType arg, MMU *mmu, CPU *cpu)
 {
-    uint16_t pc = cpu->pc;
+    uint16_t pc = cpu->PC;
     uint16_t addr = 0;
     uint16_t val = 0;
 
     switch (arg) {
     case ARG_IND_C:
-        addr = 0xFF00 + cpu->c;
+        addr = 0xFF00 + cpu->C;
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ (C)=%02X", val);
         break;
     case ARG_IND_BC:
-        addr = cpu->bc;
+        addr = cpu->BC;
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ (BC)=%02X", val);
         break;
     case ARG_IND_DE:
-        addr = cpu->de;
+        addr = cpu->DE;
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ (DE)=%02X", val);
         break;
     case ARG_IND_HL:
     case ARG_IND_HLI:
     case ARG_IND_HLD:
-        addr = cpu->hl;
+        addr = cpu->HL;
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ (HL)=%02X", val);
         break;
-    case ARG_IND_IMM8:
+    case ARG_IND_8:
         addr = 0xFF00 + arg_value(arg, mmu, pc + 1);
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ ($%02X)=%02X", addr, val);
         break;
-    case ARG_IND_IMM16:
+    case ARG_IND_16:
         addr = arg_value(arg, mmu, pc + 1);
         val = mmu_read(mmu, addr);
         strbuf_addf(str, " @ ($%04X)=%02X", addr, val);
@@ -85,7 +85,7 @@ arg_indirect(Strbuf *str, Operand arg, MMU *mmu, CPU *cpu)
 static inline void
 format_indirect(Strbuf *str, MMU *mmu, CPU *cpu)
 {
-    uint16_t pc = cpu->pc;
+    uint16_t pc = cpu->PC;
     uint8_t opcode = mmu_read(mmu, pc++);
     const Instruction *op = &opcodes[opcode];
 
@@ -153,22 +153,18 @@ format_text(Strbuf *str, MMU *mmu, uint16_t pc)
 }
 
 void
-disasm_step(MMU *mmu, CPU *cpu, FILE *out)
+disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf)
 {
-    char str[256] = {0};
-    Strbuf *buf = &(Strbuf){0};
-    strbuf_init(buf, str, sizeof(str));
-
     // Program counter: 0x0216
-    strbuf_addf(buf, "  0x%04X: ", cpu->pc);
+    strbuf_addf(buf, "  0x%04X: ", cpu->PC);
     strbuf_pad(buf, 9, ' ');
 
     // Instruction bytes: 20 FC
-    format_bytes(buf, mmu, cpu->pc);
+    format_bytes(buf, mmu, cpu->PC);
     strbuf_pad(buf, 28, ' ');
 
     // Instruction text: JR NZ,$FC @ (HL)=00
-    format_text(buf, mmu, cpu->pc);
+    format_text(buf, mmu, cpu->PC);
     format_indirect(buf, mmu, cpu);
     strbuf_pad(buf, 54, ' ');
 
@@ -182,7 +178,9 @@ disasm_step(MMU *mmu, CPU *cpu, FILE *out)
 
     // CPU registers: A:00 B:00 C:00 D:00 E:00 H:00 L:00 SP:0000
     strbuf_addf(buf, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
-                cpu->a, cpu->f, cpu->b, cpu->c, cpu->d, cpu->e, cpu->h, cpu->l, cpu->sp);
+                cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP);
 
-    fprintf(out, "%s\n", str);
+    // PPU registers
+    strbuf_addf(buf, " LCDC:%02X STAT:%02X SCY:%02X SCX:%02X LY:%02X LYC:%02X",
+                mmu->ppu.LCDC.raw, mmu->ppu.STAT.raw, mmu->ppu.SCY, mmu->ppu.SCX, mmu->ppu.LY, mmu->ppu.LYC);
 }

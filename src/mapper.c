@@ -13,7 +13,7 @@ mapper_init(Mapper *mapper, ROM *rom)
     switch (rom->header->type) {
     case 0x00:
     case 0x01: // TODO: implement MBC1
-        mapper->impl = must_alloc(sizeof(MBC0));
+        mapper->impl = xalloc(sizeof(MBC0));
         mapper->vt = &mbc0_vtable;
         mapper->name = "ROM";
         mapper->id = 0x00;
@@ -49,12 +49,13 @@ mapper_reset(Mapper *mapper)
 }
 
 inline void
-mapper_free(Mapper *mapper)
+mapper_deinit(Mapper *mapper)
 {
     assert(mapper->vt != NULL);
-    assert(mapper->vt->free != NULL);
+    assert(mapper->vt->deinit != NULL);
 
-    mapper->vt->free(mapper);
-    free(mapper->impl);
-    mapper->impl = NULL;
+    mapper->vt->deinit(mapper);
+    mapper->vt = NULL;
+
+    xfree(mapper->impl);
 }

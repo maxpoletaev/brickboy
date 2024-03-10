@@ -1,5 +1,4 @@
-#ifndef BRICKBOY_MAPPER_H
-#define BRICKBOY_MAPPER_H
+#pragma once
 
 #include <stdint.h>
 #include <assert.h>
@@ -13,7 +12,7 @@ typedef struct {
     void (*write)(Mapper *mapper, uint16_t addr, uint8_t data);
     uint8_t (*read)(Mapper *mapper, uint16_t addr);
     void (*reset)(Mapper *mapper);
-    void (*free)(Mapper *mapper);
+    void (*deinit)(Mapper *mapper);
 } MapperVT;
 
 struct Mapper {
@@ -31,6 +30,4 @@ uint8_t mapper_read(Mapper *mapper, uint16_t addr);
 
 void mapper_reset(Mapper *mapper);
 
-void mapper_free(Mapper *mapper);
-
-#endif //BRICKBOY_MAPPER_H
+void mapper_deinit(Mapper *mapper);

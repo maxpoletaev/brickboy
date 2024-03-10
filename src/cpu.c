@@ -1,8 +1,7 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
-#include <assert.h>
 
 #include "cpu.h"
 #include "common.h"
@@ -16,20 +15,21 @@ static const uint16_t reset_addr[8] = {
 void
 cpu_reset(CPU *cpu)
 {
-    cpu->af = 0x01B0;
-    cpu->bc = 0x0013;
-    cpu->de = 0x00D8;
-    cpu->hl = 0x014D;
-    cpu->sp = 0xFFFE;
-    cpu->pc = 0x0100; // skip the boot rom for now
-    cpu->ime = 0;
+    cpu->AF = 0x01B0;
+    cpu->BC = 0x0013;
+    cpu->DE = 0x00D8;
+    cpu->HL = 0x014D;
+    cpu->SP = 0xFFFE;
+    cpu->PC = 0x0100; // skip the boot rom for now
+    cpu->IME = 0;
+
     cpu->cycle = 0;
     cpu->ime_delay = -1;
     cpu->step = 0;
 }
 
 static uint16_t
-cpu_get_operand(CPU *cpu, MMU *bus, Operand src)
+cpu_get_operand(CPU *cpu, MMU *bus, ArgType src)
 {
     uint16_t value = 0;
     uint16_t addr = 0;
@@ -57,76 +57,76 @@ cpu_get_operand(CPU *cpu, MMU *bus, Operand src)
     case ARG_RST_7:
         value = reset_addr[src - ARG_RST_0];
         break;
-    case ARG_IMM16:
-        value = mmu_read16(bus, cpu->pc);
-        cpu->pc += 2;
+    case ARG_IMM_16:
+        value = mmu_read16(bus, cpu->PC);
+        cpu->PC += 2;
         break;
     case ARG_REG_A:
-        value = cpu->a;
+        value = cpu->A;
         break;
     case ARG_REG_B:
-        value = cpu->b;
+        value = cpu->B;
         break;
     case ARG_REG_C:
-        value = cpu->c;
+        value = cpu->C;
         break;
     case ARG_REG_D:
-        value = cpu->d;
+        value = cpu->D;
         break;
     case ARG_REG_E:
-        value = cpu->e;
+        value = cpu->E;
         break;
     case ARG_REG_H:
-        value = cpu->h;
+        value = cpu->H;
         break;
     case ARG_REG_L:
-        value = cpu->l;
+        value = cpu->L;
         break;
     case ARG_REG_AF:
-        value = cpu->af;
+        value = cpu->AF;
         break;
     case ARG_REG_BC:
-        value = cpu->bc;
+        value = cpu->BC;
         break;
     case ARG_REG_DE:
-        value = cpu->de;
+        value = cpu->DE;
         break;
     case ARG_REG_HL:
-        value = cpu->hl;
+        value = cpu->HL;
         break;
     case ARG_REG_SP:
-        value = cpu->sp;
+        value = cpu->SP;
         break;
     case ARG_IND_C:
-        addr = 0xFF00 + cpu->c;
+        addr = 0xFF00 + cpu->C;
         value = mmu_read(bus, addr);
         break;
     case ARG_IND_BC:
-        value = mmu_read(bus, cpu->bc);
+        value = mmu_read(bus, cpu->BC);
         break;
     case ARG_IND_DE:
-        value = mmu_read(bus, cpu->de);
+        value = mmu_read(bus, cpu->DE);
         break;
     case ARG_IND_HL:
-        value = mmu_read(bus, cpu->hl);
+        value = mmu_read(bus, cpu->HL);
         break;
     case ARG_IND_HLI:
-        value = mmu_read(bus, cpu->hl++);
+        value = mmu_read(bus, cpu->HL++);
         break;
     case ARG_IND_HLD:
-        value = mmu_read(bus, cpu->hl--);
+        value = mmu_read(bus, cpu->HL--);
         break;
-    case ARG_IMM8:
-        value = mmu_read(bus, cpu->pc++);
+    case ARG_IMM_8:
+        value = mmu_read(bus, cpu->PC++);
         break;
-    case ARG_IND_IMM8:
-        addr = 0xFF00 + mmu_read(bus, cpu->pc++);
+    case ARG_IND_8:
+        addr = 0xFF00 + mmu_read(bus, cpu->PC++);
         value = mmu_read(bus, addr);
         break;
-    case ARG_IND_IMM16:
-        addr = mmu_read16(bus, cpu->pc);
+    case ARG_IND_16:
+        addr = mmu_read16(bus, cpu->PC);
         value = mmu_read(bus, addr);
-        cpu->pc += 2;
+        cpu->PC += 2;
         break;
     case ARG_FLAG_CARRY:
         value = (uint16_t) cpu->flags.carry;
@@ -140,15 +140,15 @@ cpu_get_operand(CPU *cpu, MMU *bus, Operand src)
 }
 
 static void
-cpu_set_operand(CPU *cpu, MMU *bus, Operand target, uint16_t value16)
+cpu_set_operand(CPU *cpu, MMU *bus, ArgType target, uint16_t value16)
 {
     uint8_t value = (uint8_t) value16;
     uint16_t addr = 0;
 
     switch (target) {
     case ARG_NONE:
-    case ARG_IMM8:
-    case ARG_IMM16:
+    case ARG_IMM_8:
+    case ARG_IMM_16:
     case ARG_BIT_0:
     case ARG_BIT_1:
     case ARG_BIT_2:
@@ -169,87 +169,87 @@ cpu_set_operand(CPU *cpu, MMU *bus, Operand target, uint16_t value16)
     case ARG_FLAG_CARRY:
         PANIC("invalid target operand: %d", target);
     case ARG_REG_A:
-        cpu->a = value;
+        cpu->A = value;
         break;
     case ARG_REG_B:
-        cpu->b = value;
+        cpu->B = value;
         break;
     case ARG_REG_C:
-        cpu->c = value;
+        cpu->C = value;
         break;
     case ARG_REG_D:
-        cpu->d = value;
+        cpu->D = value;
         break;
     case ARG_REG_E:
-        cpu->e = value;
+        cpu->E = value;
         break;
     case ARG_REG_H:
-        cpu->h = value;
+        cpu->H = value;
         break;
     case ARG_REG_L:
-        cpu->l = value;
+        cpu->L = value;
         break;
     case ARG_REG_AF:
-        cpu->af = value16;
+        cpu->AF = value16;
         break;
     case ARG_REG_BC:
-        cpu->bc = value16;
+        cpu->BC = value16;
         break;
     case ARG_REG_DE:
-        cpu->de = value16;
+        cpu->DE = value16;
         break;
     case ARG_REG_HL:
-        cpu->hl = value16;
+        cpu->HL = value16;
         break;
     case ARG_REG_SP:
-        cpu->sp = value16;
+        cpu->SP = value16;
         break;
     case ARG_IND_C:
-        addr = 0xFF00 + cpu->c;
+        addr = 0xFF00 + cpu->C;
         mmu_write(bus, addr, value);
         break;
     case ARG_IND_BC:
-        mmu_write(bus, cpu->bc, value);
+        mmu_write(bus, cpu->BC, value);
         break;
     case ARG_IND_DE:
-        mmu_write(bus, cpu->de, value);
+        mmu_write(bus, cpu->DE, value);
         break;
     case ARG_IND_HL:
-        mmu_write(bus, cpu->hl, value);
+        mmu_write(bus, cpu->HL, value);
         break;
     case ARG_IND_HLI:
-        mmu_write(bus, cpu->hl++, value);
+        mmu_write(bus, cpu->HL++, value);
         break;
     case ARG_IND_HLD:
-        mmu_write(bus, cpu->hl--, value);
+        mmu_write(bus, cpu->HL--, value);
         break;
-    case ARG_IND_IMM8:
-        addr = 0xFF00 + mmu_read(bus, cpu->pc++);
+    case ARG_IND_8:
+        addr = 0xFF00 + mmu_read(bus, cpu->PC++);
         mmu_write(bus, addr, value);
         break;
-    case ARG_IND_IMM16:
-        addr = mmu_read16(bus, cpu->pc);
+    case ARG_IND_16:
+        addr = mmu_read16(bus, cpu->PC);
         mmu_write(bus, addr, value);
-        cpu->pc += 2;
+        cpu->PC += 2;
         break;
     }
 }
 
 static uint8_t
-cpu_getbit(CPU *cpu, MMU *bus, Operand arg, uint8_t bit)
+cpu_getbit(CPU *cpu, MMU *bus, ArgType arg, uint8_t bit)
 {
     uint8_t value = (uint8_t) cpu_get_operand(cpu, bus, arg);
-    return (value >> bit) & 1;
+    return (value >> bit&7) & 1;
 }
 
 static void
-cpu_setbit(CPU *cpu, MMU *bus, Operand arg, uint8_t bit, uint8_t value)
+cpu_setbit(CPU *cpu, MMU *bus, ArgType arg, uint8_t bit, uint8_t value)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, arg);
 
-    assert(bit < 8);
-    v &= ~(1 << bit); // clear bit first
-    v |= (value & 1) << bit; // OR in the new value
+    bit &= 7;
+    value &= 1;
+    v &= ~(1 << bit) | (value << bit);
 
     cpu_set_operand(cpu, bus, arg, v);
 }
@@ -257,15 +257,15 @@ cpu_setbit(CPU *cpu, MMU *bus, Operand arg, uint8_t bit, uint8_t value)
 static void
 cpu_push(CPU *cpu, MMU *bus, uint16_t value)
 {
-    cpu->sp -= 2;
-    mmu_write16(bus, cpu->sp, value);
+    cpu->SP -= 2;
+    mmu_write16(bus, cpu->SP, value);
 }
 
 static uint16_t
 cpu_pop(CPU *cpu, MMU *bus)
 {
-    uint16_t value = mmu_read16(bus, cpu->sp);
-    cpu->sp += 2;
+    uint16_t value = mmu_read16(bus, cpu->SP);
+    cpu->SP += 2;
     return value;
 }
 
@@ -289,15 +289,15 @@ cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc)
 {
     cpu->halted = false;
 
-    if (cpu->ime == 0) {
+    if (cpu->IME == 0) {
         return false;
     }
 
-    cpu->ime = 0; // disable interrupts
+    cpu->IME = 0; // disable interrupts
 
-    cpu_push(cpu, bus, cpu->pc);
+    cpu_push(cpu, bus, cpu->PC);
 
-    cpu->pc = pc;
+    cpu->PC = pc;
 
     return true;
 }
@@ -305,12 +305,12 @@ cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc)
 static inline const Instruction *
 cpu_execute(CPU *cpu, MMU *bus)
 {
-    uint8_t opcode = mmu_read(bus, cpu->pc++);
+    uint8_t opcode = mmu_read(bus, cpu->PC++);
     const Instruction *op = &opcodes[opcode];
 
     // Prefixed instructions
     if (opcode == 0xCB) {
-        opcode = mmu_read(bus, cpu->pc++);
+        opcode = mmu_read(bus, cpu->PC++);
         op = &cb_opcodes[opcode];
     }
 
@@ -320,7 +320,7 @@ cpu_execute(CPU *cpu, MMU *bus)
 
     // EI takes effect one instruction later
     if (cpu->ime_delay != -1) {
-        cpu->ime = cpu->ime_delay;
+        cpu->IME = cpu->ime_delay;
         cpu->ime_delay = -1;
     }
 
@@ -344,22 +344,6 @@ cpu_step(CPU *cpu, MMU *bus)
     const Instruction *op = cpu_execute(cpu, bus);
 
     cpu->step = op->cycles - 1;
-}
-
-int
-cpu_step_fast(CPU *cpu, MMU *bus)
-{
-    if (cpu->halted) {
-        return 0;
-    }
-
-    const Instruction *op = cpu_execute(cpu, bus);
-
-    int cycles = (int) (op->cycles + cpu->step);
-
-    cpu->step = 0;
-
-    return cycles;
 }
 
 /* ----------------------------------------------------------------------------
@@ -395,7 +379,7 @@ daa(CPU *cpu, MMU *bus, const Instruction *op)
     UNUSED(bus);
     UNUSED(op);
 
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
     uint8_t correction = cpu->flags.carry ? 0x60 : 0x00;
 
     if (cpu->flags.half_carry || (!cpu->flags.negative && (a&0xF) > 9)) {
@@ -416,7 +400,7 @@ daa(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = 0;
     cpu->flags.carry = correction >= 0x60;
 
-    cpu->a = a;
+    cpu->A = a;
 }
 
 /* CPL
@@ -428,7 +412,7 @@ cpl(CPU *cpu, MMU *bus, const Instruction *op)
     UNUSED(bus);
     UNUSED(op);
 
-    cpu->a = ~cpu->a;
+    cpu->A = ~cpu->A;
     cpu->flags.negative = 1;
     cpu->flags.half_carry = 1;
 }
@@ -488,7 +472,7 @@ static void
 ld_hl_sp(CPU *cpu, MMU *bus, const Instruction *op)
 {
     int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint16_t sp = cpu->sp;
+    uint16_t sp = cpu->SP;
 
     int32_t sum = (int32_t) sp + (int32_t) v;
     uint8_t half_sum = (sp&0xF) + (v&0xF);
@@ -499,7 +483,7 @@ ld_hl_sp(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFF;
 
-    cpu->hl = r;
+    cpu->HL = r;
 }
 
 /* INC r8
@@ -569,7 +553,7 @@ static void
 add_a(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
 
     uint16_t sum = (uint16_t) a + (uint16_t) v;
     uint8_t half_sum = (a&0xF) + (v&0xF);
@@ -580,7 +564,7 @@ add_a(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFF;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* Add HL,r16
@@ -590,7 +574,7 @@ static void
 add_hl(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_get_operand(cpu, bus, op->arg1);
-    uint16_t hl = cpu->hl;
+    uint16_t hl = cpu->HL;
 
     uint16_t half_sum = (hl&0x0FFF) + (v&0x0FFF);
     uint32_t sum = (uint32_t) hl + (uint32_t) v;
@@ -600,7 +584,7 @@ add_hl(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0x0FFF;
     cpu->flags.carry = sum > 0xFFFF;
 
-    cpu->hl = r;
+    cpu->HL = r;
 }
 
 /* ADD SP,s8
@@ -610,7 +594,7 @@ static void
 add_sp(CPU *cpu, MMU *bus, const Instruction *op)
 {
     int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint16_t sp = cpu->sp;
+    uint16_t sp = cpu->SP;
 
     int32_t sum = (int32_t) sp + (int32_t) v;
     uint8_t half_sum = (sp&0xF) + (v&0xF);
@@ -621,7 +605,7 @@ add_sp(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFFFF;
 
-    cpu->sp = r;
+    cpu->SP = r;
 }
 
 /* ADC A,r8
@@ -632,7 +616,7 @@ adc8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
 
     uint16_t sum = (uint16_t) a + (uint16_t) v + (uint16_t) c;
     uint8_t half_sum = (a&0xF) + (v&0xF) + c;
@@ -643,7 +627,7 @@ adc8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFF;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* SUB A,r8
@@ -653,7 +637,7 @@ static void
 sub8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
 
     uint16_t sum = (uint16_t) a - (uint16_t) v;
     uint8_t half_sum = (a&0xF) - (v&0xF);
@@ -664,7 +648,7 @@ sub8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFF;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* SBC A,r8
@@ -675,7 +659,7 @@ sbc8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint8_t c = cpu->flags.carry;
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
 
     uint16_t sum = (uint16_t) a - (uint16_t) v - (uint16_t) c;
     uint8_t half_sum = (a&0xF) - (v&0xF) - c;
@@ -686,7 +670,7 @@ sbc8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = half_sum > 0xF;
     cpu->flags.carry = sum > 0xFF;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* AND r8
@@ -696,7 +680,7 @@ static void
 and8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
     uint8_t r = a & v;
 
     cpu->flags.zero = r == 0;
@@ -704,7 +688,7 @@ and8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = 1;
     cpu->flags.carry = 0;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* JP a16
@@ -714,7 +698,7 @@ static void
 jp16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
-    cpu->pc = addr;
+    cpu->PC = addr;
 }
 
 /* JP F,a16
@@ -727,7 +711,7 @@ jp16_if(CPU *cpu, MMU *bus, const Instruction *op)
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
-        cpu->pc = addr;
+        cpu->PC = addr;
         cpu->step += 1;
     }
 }
@@ -742,7 +726,7 @@ jp16_ifn(CPU *cpu, MMU *bus, const Instruction *op)
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
-        cpu->pc = addr;
+        cpu->PC = addr;
         cpu->step += 1;
     }
 }
@@ -754,7 +738,7 @@ static void
 jr8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
-    cpu->pc += offset;
+    cpu->PC += offset;
 }
 
 /* JR F,s8
@@ -767,7 +751,7 @@ jr8_if(CPU *cpu, MMU *bus, const Instruction *op)
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
-        cpu->pc += offset;
+        cpu->PC += offset;
         cpu->step += 1;
     }
 }
@@ -782,7 +766,7 @@ jr8_ifn(CPU *cpu, MMU *bus, const Instruction *op)
     int8_t offset = (int8_t) cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
-        cpu->pc += offset;
+        cpu->PC += offset;
         cpu->step += 1;
     }
 }
@@ -794,7 +778,7 @@ static void
 xor8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
     uint8_t r = a ^ v;
 
     cpu->flags.zero = r == 0;
@@ -802,7 +786,7 @@ xor8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = 0;
     cpu->flags.carry = 0;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* OR r8
@@ -812,7 +796,7 @@ static void
 or8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
     uint8_t r = a | v;
 
     cpu->flags.zero = r == 0;
@@ -820,7 +804,7 @@ or8(CPU *cpu, MMU *bus, const Instruction *op)
     cpu->flags.half_carry = 0;
     cpu->flags.carry = 0;
 
-    cpu->a = r;
+    cpu->A = r;
 }
 
 /* CP r8
@@ -830,7 +814,7 @@ static void
 cp8(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t a = cpu->a;
+    uint8_t a = cpu->A;
 
     uint16_t sum = (uint16_t) a - (uint16_t) v;
     uint8_t half_sum = (a&0xF) - (v&0xF);
@@ -873,8 +857,8 @@ static void
 call(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
-    cpu_push(cpu, bus, cpu->pc);
-    cpu->pc = addr;
+    cpu_push(cpu, bus, cpu->PC);
+    cpu->PC = addr;
 }
 
 /* CALL F,a16
@@ -887,9 +871,9 @@ call_if(CPU *cpu, MMU *bus, const Instruction *op)
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
-        cpu_push(cpu, bus, cpu->pc);
+        cpu_push(cpu, bus, cpu->PC);
         cpu->step += 3;
-        cpu->pc = addr;
+        cpu->PC = addr;
     }
 }
 
@@ -903,9 +887,9 @@ call_ifn(CPU *cpu, MMU *bus, const Instruction *op)
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
-        cpu_push(cpu, bus, cpu->pc);
+        cpu_push(cpu, bus, cpu->PC);
         cpu->step += 3;
-        cpu->pc = addr;
+        cpu->PC = addr;
     }
 }
 
@@ -918,7 +902,7 @@ ret(CPU *cpu, MMU *bus, const Instruction *op)
     UNUSED(bus);
     UNUSED(op);
 
-    cpu->pc = cpu_pop(cpu, bus);
+    cpu->PC = cpu_pop(cpu, bus);
 }
 
 /* RET F
@@ -930,7 +914,7 @@ ret_if(CPU *cpu, MMU *bus, const Instruction *op)
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
 
     if (flag) {
-        cpu->pc = cpu_pop(cpu, bus);
+        cpu->PC = cpu_pop(cpu, bus);
         cpu->step += 3;
     }
 }
@@ -944,7 +928,7 @@ ret_ifn(CPU *cpu, MMU *bus, const Instruction *op)
     bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
 
     if (!flag) {
-        cpu->pc = cpu_pop(cpu, bus);
+        cpu->PC = cpu_pop(cpu, bus);
         cpu->step += 3;
     }
 }
@@ -958,8 +942,8 @@ reti(CPU *cpu, MMU *bus, const Instruction *op)
     UNUSED(bus);
     UNUSED(op);
 
-    cpu->pc = cpu_pop(cpu, bus);
-    cpu->ime = 1; // looks like not delayed unlike EI
+    cpu->PC = cpu_pop(cpu, bus);
+    cpu->IME = 1; // looks like not delayed unlike EI
     cpu->ime_delay = -1;
 }
 
@@ -971,8 +955,8 @@ static void
 rst(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg1);
-    cpu_push(cpu, bus, cpu->pc);
-    cpu->pc = addr;
+    cpu_push(cpu, bus, cpu->PC);
+    cpu->PC = addr;
 }
 
 /* RLC r8
@@ -982,7 +966,7 @@ static void
 rlc(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t r = (uint8_t) (v << 1) | (v >> 7);
+    uint8_t r = (uint8_t) ((v << 1) | (v >> 7));
 
     cpu->flags.zero = r == 0;
     cpu->flags.negative = 0;
@@ -1033,7 +1017,7 @@ static void
 rlca(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, op->arg1);
-    uint8_t r = (uint8_t) (v << 1) | (v >> 7);
+    uint8_t r = (uint8_t) ((v << 1) | (v >> 7));
 
     cpu->flags.zero = 0;
     cpu->flags.negative = 0;
@@ -1172,7 +1156,7 @@ di(CPU *cpu, MMU *bus, const Instruction *op)
     UNUSED(bus);
     UNUSED(op);
 
-    cpu->ime = 0;
+    cpu->IME = 0;
 }
 
 /* EI
@@ -1245,543 +1229,543 @@ res(CPU *cpu, MMU *bus, const Instruction *op)
  * -------------------------------------------------------------------------- */
 
 #define OPCODE(op, arg1, arg2, handler, cost, text) \
-    [op] = {op, cost, arg1, arg2, handler, text}
+    [op] = {op, cost, ARG_##arg1, ARG_##arg2, handler, text}
 
 const Instruction opcodes[256] = {
-    OPCODE(0x00, ARG_NONE, ARG_NONE, nop, 1, "NOP"),
-    OPCODE(0xF3, ARG_NONE, ARG_NONE, di, 1, "DI"),
-    OPCODE(0xFB, ARG_NONE, ARG_NONE, ei, 1, "EI"),
-    OPCODE(0x27, ARG_NONE, ARG_NONE, daa, 1, "DAA"),
-    OPCODE(0x2F, ARG_NONE, ARG_NONE, cpl, 1, "CPL"),
-    OPCODE(0x37, ARG_NONE, ARG_NONE, scf, 1, "SCF"),
-    OPCODE(0x3F, ARG_NONE, ARG_NONE, ccf, 1, "CCF"),
-    OPCODE(0x76, ARG_NONE, ARG_NONE, halt, 1, "HALT"),
+    OPCODE(0x00, NONE, NONE, nop, 1, "NOP"),
+    OPCODE(0xF3, NONE, NONE, di, 1, "DI"),
+    OPCODE(0xFB, NONE, NONE, ei, 1, "EI"),
+    OPCODE(0x27, NONE, NONE, daa, 1, "DAA"),
+    OPCODE(0x2F, NONE, NONE, cpl, 1, "CPL"),
+    OPCODE(0x37, NONE, NONE, scf, 1, "SCF"),
+    OPCODE(0x3F, NONE, NONE, ccf, 1, "CCF"),
+    OPCODE(0x76, NONE, NONE, halt, 1, "HALT"),
 
-    OPCODE(0x04, ARG_REG_B, ARG_NONE, inc8, 1, "INC B"),
-    OPCODE(0x0C, ARG_REG_C, ARG_NONE, inc8, 1, "INC C"),
-    OPCODE(0x14, ARG_REG_D, ARG_NONE, inc8, 1, "INC D"),
-    OPCODE(0x1C, ARG_REG_E, ARG_NONE, inc8, 1, "INC E"),
-    OPCODE(0x24, ARG_REG_H, ARG_NONE, inc8, 1, "INC H"),
-    OPCODE(0x2C, ARG_REG_L, ARG_NONE, inc8, 1, "INC L"),
-    OPCODE(0x3C, ARG_REG_A, ARG_NONE, inc8, 1, "INC A"),
-    OPCODE(0x34, ARG_IND_HL, ARG_NONE, inc8, 3, "INC (HL)"),
+    OPCODE(0x04, REG_B, NONE, inc8, 1, "INC B"),
+    OPCODE(0x0C, REG_C, NONE, inc8, 1, "INC C"),
+    OPCODE(0x14, REG_D, NONE, inc8, 1, "INC D"),
+    OPCODE(0x1C, REG_E, NONE, inc8, 1, "INC E"),
+    OPCODE(0x24, REG_H, NONE, inc8, 1, "INC H"),
+    OPCODE(0x2C, REG_L, NONE, inc8, 1, "INC L"),
+    OPCODE(0x3C, REG_A, NONE, inc8, 1, "INC A"),
+    OPCODE(0x34, IND_HL, NONE, inc8, 3, "INC (HL)"),
 
-    OPCODE(0x03, ARG_REG_BC, ARG_NONE, inc16, 2, "INC BC"),
-    OPCODE(0x13, ARG_REG_DE, ARG_NONE, inc16, 2, "INC DE"),
-    OPCODE(0x23, ARG_REG_HL, ARG_NONE, inc16, 2, "INC HL"),
-    OPCODE(0x33, ARG_REG_SP, ARG_NONE, inc16, 2, "INC SP"),
+    OPCODE(0x03, REG_BC, NONE, inc16, 2, "INC BC"),
+    OPCODE(0x13, REG_DE, NONE, inc16, 2, "INC DE"),
+    OPCODE(0x23, REG_HL, NONE, inc16, 2, "INC HL"),
+    OPCODE(0x33, REG_SP, NONE, inc16, 2, "INC SP"),
 
-    OPCODE(0x05, ARG_REG_B, ARG_NONE, dec8, 1, "DEC B"),
-    OPCODE(0x0D, ARG_REG_C, ARG_NONE, dec8, 1, "DEC C"),
-    OPCODE(0x15, ARG_REG_D, ARG_NONE, dec8, 1, "DEC D"),
-    OPCODE(0x1D, ARG_REG_E, ARG_NONE, dec8, 1, "DEC E"),
-    OPCODE(0x25, ARG_REG_H, ARG_NONE, dec8, 1, "DEC H"),
-    OPCODE(0x2D, ARG_REG_L, ARG_NONE, dec8, 1, "DEC L"),
-    OPCODE(0x3D, ARG_REG_A, ARG_NONE, dec8, 1, "DEC A"),
-    OPCODE(0x35, ARG_IND_HL, ARG_NONE, dec8, 3, "DEC (HL)"),
+    OPCODE(0x05, REG_B, NONE, dec8, 1, "DEC B"),
+    OPCODE(0x0D, REG_C, NONE, dec8, 1, "DEC C"),
+    OPCODE(0x15, REG_D, NONE, dec8, 1, "DEC D"),
+    OPCODE(0x1D, REG_E, NONE, dec8, 1, "DEC E"),
+    OPCODE(0x25, REG_H, NONE, dec8, 1, "DEC H"),
+    OPCODE(0x2D, REG_L, NONE, dec8, 1, "DEC L"),
+    OPCODE(0x3D, REG_A, NONE, dec8, 1, "DEC A"),
+    OPCODE(0x35, IND_HL, NONE, dec8, 3, "DEC (HL)"),
 
-    OPCODE(0x0B, ARG_REG_BC, ARG_NONE, dec16, 2, "DEC BC"),
-    OPCODE(0x1B, ARG_REG_DE, ARG_NONE, dec16, 2, "DEC DE"),
-    OPCODE(0x2B, ARG_REG_HL, ARG_NONE, dec16, 2, "DEC HL"),
-    OPCODE(0x3B, ARG_REG_SP, ARG_NONE, dec16, 2, "DEC SP"),
+    OPCODE(0x0B, REG_BC, NONE, dec16, 2, "DEC BC"),
+    OPCODE(0x1B, REG_DE, NONE, dec16, 2, "DEC DE"),
+    OPCODE(0x2B, REG_HL, NONE, dec16, 2, "DEC HL"),
+    OPCODE(0x3B, REG_SP, NONE, dec16, 2, "DEC SP"),
 
-    OPCODE(0x02, ARG_IND_BC, ARG_REG_A, ld8, 2, "LD (BC),A"),
-    OPCODE(0x0A, ARG_REG_A, ARG_IND_BC, ld8, 2, "LD A,(BC)"),
-    OPCODE(0x12, ARG_IND_DE, ARG_REG_A, ld8, 2, "LD (DE),A"),
-    OPCODE(0x1A, ARG_REG_A, ARG_IND_DE, ld8, 2, "LD A,(DE)"),
-    OPCODE(0x22, ARG_IND_HLI, ARG_REG_A, ld8, 2, "LD (HL+),A"),
-    OPCODE(0x2A, ARG_REG_A, ARG_IND_HLI, ld8, 2, "LD A,(HL+)"),
-    OPCODE(0x32, ARG_IND_HLD, ARG_REG_A, ld8, 2, "LD (HL-),A"),
-    OPCODE(0x3A, ARG_REG_A, ARG_IND_HLD, ld8, 2, "LD A,(HL-)"),
-    OPCODE(0x40, ARG_REG_B, ARG_REG_B, ld8, 1, "LD B,B"),
-    OPCODE(0x41, ARG_REG_B, ARG_REG_C, ld8, 1, "LD B,C"),
-    OPCODE(0x42, ARG_REG_B, ARG_REG_D, ld8, 1, "LD B,D"),
-    OPCODE(0x43, ARG_REG_B, ARG_REG_E, ld8, 1, "LD B,E"),
-    OPCODE(0x44, ARG_REG_B, ARG_REG_H, ld8, 1, "LD B,H"),
-    OPCODE(0x45, ARG_REG_B, ARG_REG_L, ld8, 1, "LD B,L"),
-    OPCODE(0x46, ARG_REG_B, ARG_IND_HL, ld8, 2, "LD B,(HL)"),
-    OPCODE(0x47, ARG_REG_B, ARG_REG_A, ld8, 1, "LD B,A"),
-    OPCODE(0x48, ARG_REG_C, ARG_REG_B, ld8, 1, "LD C,B"),
-    OPCODE(0x49, ARG_REG_C, ARG_REG_C, ld8, 1, "LD C,C"),
-    OPCODE(0x4A, ARG_REG_C, ARG_REG_D, ld8, 1, "LD C,D"),
-    OPCODE(0x4B, ARG_REG_C, ARG_REG_E, ld8, 1, "LD C,E"),
-    OPCODE(0x4C, ARG_REG_C, ARG_REG_H, ld8, 1, "LD C,H"),
-    OPCODE(0x4D, ARG_REG_C, ARG_REG_L, ld8, 1, "LD C,L"),
-    OPCODE(0x4E, ARG_REG_C, ARG_IND_HL, ld8, 2, "LD C,(HL)"),
-    OPCODE(0x4F, ARG_REG_C, ARG_REG_A, ld8, 1, "LD C,A"),
-    OPCODE(0x50, ARG_REG_D, ARG_REG_B, ld8, 1, "LD D,B"),
-    OPCODE(0x51, ARG_REG_D, ARG_REG_C, ld8, 1, "LD D,C"),
-    OPCODE(0x52, ARG_REG_D, ARG_REG_D, ld8, 1, "LD D,D"),
-    OPCODE(0x53, ARG_REG_D, ARG_REG_E, ld8, 1, "LD D,E"),
-    OPCODE(0x54, ARG_REG_D, ARG_REG_H, ld8, 1, "LD D,H"),
-    OPCODE(0x55, ARG_REG_D, ARG_REG_L, ld8, 1, "LD D,L"),
-    OPCODE(0x56, ARG_REG_D, ARG_IND_HL, ld8, 2, "LD D,(HL)"),
-    OPCODE(0x57, ARG_REG_D, ARG_REG_A, ld8, 1, "LD D,A"),
-    OPCODE(0x58, ARG_REG_E, ARG_REG_B, ld8, 1, "LD E,B"),
-    OPCODE(0x59, ARG_REG_E, ARG_REG_C, ld8, 1, "LD E,C"),
-    OPCODE(0x5A, ARG_REG_E, ARG_REG_D, ld8, 1, "LD E,D"),
-    OPCODE(0x5B, ARG_REG_E, ARG_REG_E, ld8, 1, "LD E,E"),
-    OPCODE(0x5C, ARG_REG_E, ARG_REG_H, ld8, 1, "LD E,H"),
-    OPCODE(0x5D, ARG_REG_E, ARG_REG_L, ld8, 1, "LD E,L"),
-    OPCODE(0x5E, ARG_REG_E, ARG_IND_HL, ld8, 2, "LD E,(HL)"),
-    OPCODE(0x5F, ARG_REG_E, ARG_REG_A, ld8, 1, "LD E,A"),
-    OPCODE(0x60, ARG_REG_H, ARG_REG_B, ld8, 1, "LD H,B"),
-    OPCODE(0x61, ARG_REG_H, ARG_REG_C, ld8, 1, "LD H,C"),
-    OPCODE(0x62, ARG_REG_H, ARG_REG_D, ld8, 1, "LD H,D"),
-    OPCODE(0x63, ARG_REG_H, ARG_REG_E, ld8, 1, "LD H,E"),
-    OPCODE(0x64, ARG_REG_H, ARG_REG_H, ld8, 1, "LD H,H"),
-    OPCODE(0x65, ARG_REG_H, ARG_REG_L, ld8, 1, "LD H,L"),
-    OPCODE(0x66, ARG_REG_H, ARG_IND_HL, ld8, 2, "LD H,(HL)"),
-    OPCODE(0x67, ARG_REG_H, ARG_REG_A, ld8, 1, "LD H,A"),
-    OPCODE(0x68, ARG_REG_L, ARG_REG_B, ld8, 1, "LD L,B"),
-    OPCODE(0x69, ARG_REG_L, ARG_REG_C, ld8, 1, "LD L,C"),
-    OPCODE(0x6A, ARG_REG_L, ARG_REG_D, ld8, 1, "LD L,D"),
-    OPCODE(0x6B, ARG_REG_L, ARG_REG_E, ld8, 1, "LD L,E"),
-    OPCODE(0x6C, ARG_REG_L, ARG_REG_H, ld8, 1, "LD L,H"),
-    OPCODE(0x6D, ARG_REG_L, ARG_REG_L, ld8, 1, "LD L,L"),
-    OPCODE(0x6E, ARG_REG_L, ARG_IND_HL, ld8, 2, "LD L,(HL)"),
-    OPCODE(0x6F, ARG_REG_L, ARG_REG_A, ld8, 1, "LD L,A"),
-    OPCODE(0x70, ARG_IND_HL, ARG_REG_B, ld8, 2, "LD (HL),B"),
-    OPCODE(0x71, ARG_IND_HL, ARG_REG_C, ld8, 2, "LD (HL),C"),
-    OPCODE(0x72, ARG_IND_HL, ARG_REG_D, ld8, 2, "LD (HL),D"),
-    OPCODE(0x73, ARG_IND_HL, ARG_REG_E, ld8, 2, "LD (HL),E"),
-    OPCODE(0x74, ARG_IND_HL, ARG_REG_H, ld8, 2, "LD (HL),H"),
-    OPCODE(0x75, ARG_IND_HL, ARG_REG_L, ld8, 2, "LD (HL),L"),
-    OPCODE(0x77, ARG_IND_HL, ARG_REG_A, ld8, 2, "LD (HL),A"),
-    OPCODE(0x78, ARG_REG_A, ARG_REG_B, ld8, 1, "LD A,B"),
-    OPCODE(0x79, ARG_REG_A, ARG_REG_C, ld8, 1, "LD A,C"),
-    OPCODE(0x7A, ARG_REG_A, ARG_REG_D, ld8, 1, "LD A,D"),
-    OPCODE(0x7B, ARG_REG_A, ARG_REG_E, ld8, 1, "LD A,E"),
-    OPCODE(0x7C, ARG_REG_A, ARG_REG_H, ld8, 1, "LD A,H"),
-    OPCODE(0x7D, ARG_REG_A, ARG_REG_L, ld8, 1, "LD A,L"),
-    OPCODE(0x7E, ARG_REG_A, ARG_IND_HL, ld8, 2, "LD A,(HL)"),
-    OPCODE(0x7F, ARG_REG_A, ARG_REG_A, ld8, 1, "LD A,A"),
-    OPCODE(0xE0, ARG_IND_IMM8, ARG_REG_A, ld8, 3, "LD ($%02X),A"),
-    OPCODE(0xF0, ARG_REG_A, ARG_IND_IMM8, ld8, 3, "LD A,($%02X)"),
-    OPCODE(0xEA, ARG_IND_IMM16, ARG_REG_A, ld8, 4, "LD ($%04X),A"),
-    OPCODE(0xFA, ARG_REG_A, ARG_IND_IMM16, ld8, 4, "LD A,($%04X)"),
-    OPCODE(0x06, ARG_REG_B, ARG_IMM8, ld8, 2, "LD B,$%02X"),
-    OPCODE(0xE2, ARG_IND_C, ARG_REG_A, ld8, 2, "LD (C),A"),
-    OPCODE(0xF2, ARG_REG_C, ARG_IMM8, ld8, 2, "LD C,$%02X"),
-    OPCODE(0x0E, ARG_REG_C, ARG_IMM8, ld8, 2, "LD C,$%02X"),
-    OPCODE(0x16, ARG_REG_D, ARG_IMM8, ld8, 2, "LD D,$%02X"),
-    OPCODE(0x1E, ARG_REG_E, ARG_IMM8, ld8, 2, "LD E,$%02X"),
-    OPCODE(0x26, ARG_REG_H, ARG_IMM8, ld8, 2, "LD H,$%02X"),
-    OPCODE(0x2E, ARG_REG_L, ARG_IMM8, ld8, 2, "LD L,$%02X"),
-    OPCODE(0x36, ARG_IND_HL, ARG_IMM8, ld8, 3, "LD (HL),$%02X"),
-    OPCODE(0x3E, ARG_REG_A, ARG_IMM8, ld8, 2, "LD A,$%02X"),
+    OPCODE(0x02, IND_BC, REG_A, ld8, 2, "LD (BC),A"),
+    OPCODE(0x0A, REG_A, IND_BC, ld8, 2, "LD A,(BC)"),
+    OPCODE(0x12, IND_DE, REG_A, ld8, 2, "LD (DE),A"),
+    OPCODE(0x1A, REG_A, IND_DE, ld8, 2, "LD A,(DE)"),
+    OPCODE(0x22, IND_HLI, REG_A, ld8, 2, "LD (HL+),A"),
+    OPCODE(0x2A, REG_A, IND_HLI, ld8, 2, "LD A,(HL+)"),
+    OPCODE(0x32, IND_HLD, REG_A, ld8, 2, "LD (HL-),A"),
+    OPCODE(0x3A, REG_A, IND_HLD, ld8, 2, "LD A,(HL-)"),
+    OPCODE(0x40, REG_B, REG_B, ld8, 1, "LD B,B"),
+    OPCODE(0x41, REG_B, REG_C, ld8, 1, "LD B,C"),
+    OPCODE(0x42, REG_B, REG_D, ld8, 1, "LD B,D"),
+    OPCODE(0x43, REG_B, REG_E, ld8, 1, "LD B,E"),
+    OPCODE(0x44, REG_B, REG_H, ld8, 1, "LD B,H"),
+    OPCODE(0x45, REG_B, REG_L, ld8, 1, "LD B,L"),
+    OPCODE(0x46, REG_B, IND_HL, ld8, 2, "LD B,(HL)"),
+    OPCODE(0x47, REG_B, REG_A, ld8, 1, "LD B,A"),
+    OPCODE(0x48, REG_C, REG_B, ld8, 1, "LD C,B"),
+    OPCODE(0x49, REG_C, REG_C, ld8, 1, "LD C,C"),
+    OPCODE(0x4A, REG_C, REG_D, ld8, 1, "LD C,D"),
+    OPCODE(0x4B, REG_C, REG_E, ld8, 1, "LD C,E"),
+    OPCODE(0x4C, REG_C, REG_H, ld8, 1, "LD C,H"),
+    OPCODE(0x4D, REG_C, REG_L, ld8, 1, "LD C,L"),
+    OPCODE(0x4E, REG_C, IND_HL, ld8, 2, "LD C,(HL)"),
+    OPCODE(0x4F, REG_C, REG_A, ld8, 1, "LD C,A"),
+    OPCODE(0x50, REG_D, REG_B, ld8, 1, "LD D,B"),
+    OPCODE(0x51, REG_D, REG_C, ld8, 1, "LD D,C"),
+    OPCODE(0x52, REG_D, REG_D, ld8, 1, "LD D,D"),
+    OPCODE(0x53, REG_D, REG_E, ld8, 1, "LD D,E"),
+    OPCODE(0x54, REG_D, REG_H, ld8, 1, "LD D,H"),
+    OPCODE(0x55, REG_D, REG_L, ld8, 1, "LD D,L"),
+    OPCODE(0x56, REG_D, IND_HL, ld8, 2, "LD D,(HL)"),
+    OPCODE(0x57, REG_D, REG_A, ld8, 1, "LD D,A"),
+    OPCODE(0x58, REG_E, REG_B, ld8, 1, "LD E,B"),
+    OPCODE(0x59, REG_E, REG_C, ld8, 1, "LD E,C"),
+    OPCODE(0x5A, REG_E, REG_D, ld8, 1, "LD E,D"),
+    OPCODE(0x5B, REG_E, REG_E, ld8, 1, "LD E,E"),
+    OPCODE(0x5C, REG_E, REG_H, ld8, 1, "LD E,H"),
+    OPCODE(0x5D, REG_E, REG_L, ld8, 1, "LD E,L"),
+    OPCODE(0x5E, REG_E, IND_HL, ld8, 2, "LD E,(HL)"),
+    OPCODE(0x5F, REG_E, REG_A, ld8, 1, "LD E,A"),
+    OPCODE(0x60, REG_H, REG_B, ld8, 1, "LD H,B"),
+    OPCODE(0x61, REG_H, REG_C, ld8, 1, "LD H,C"),
+    OPCODE(0x62, REG_H, REG_D, ld8, 1, "LD H,D"),
+    OPCODE(0x63, REG_H, REG_E, ld8, 1, "LD H,E"),
+    OPCODE(0x64, REG_H, REG_H, ld8, 1, "LD H,H"),
+    OPCODE(0x65, REG_H, REG_L, ld8, 1, "LD H,L"),
+    OPCODE(0x66, REG_H, IND_HL, ld8, 2, "LD H,(HL)"),
+    OPCODE(0x67, REG_H, REG_A, ld8, 1, "LD H,A"),
+    OPCODE(0x68, REG_L, REG_B, ld8, 1, "LD L,B"),
+    OPCODE(0x69, REG_L, REG_C, ld8, 1, "LD L,C"),
+    OPCODE(0x6A, REG_L, REG_D, ld8, 1, "LD L,D"),
+    OPCODE(0x6B, REG_L, REG_E, ld8, 1, "LD L,E"),
+    OPCODE(0x6C, REG_L, REG_H, ld8, 1, "LD L,H"),
+    OPCODE(0x6D, REG_L, REG_L, ld8, 1, "LD L,L"),
+    OPCODE(0x6E, REG_L, IND_HL, ld8, 2, "LD L,(HL)"),
+    OPCODE(0x6F, REG_L, REG_A, ld8, 1, "LD L,A"),
+    OPCODE(0x70, IND_HL, REG_B, ld8, 2, "LD (HL),B"),
+    OPCODE(0x71, IND_HL, REG_C, ld8, 2, "LD (HL),C"),
+    OPCODE(0x72, IND_HL, REG_D, ld8, 2, "LD (HL),D"),
+    OPCODE(0x73, IND_HL, REG_E, ld8, 2, "LD (HL),E"),
+    OPCODE(0x74, IND_HL, REG_H, ld8, 2, "LD (HL),H"),
+    OPCODE(0x75, IND_HL, REG_L, ld8, 2, "LD (HL),L"),
+    OPCODE(0x77, IND_HL, REG_A, ld8, 2, "LD (HL),A"),
+    OPCODE(0x78, REG_A, REG_B, ld8, 1, "LD A,B"),
+    OPCODE(0x79, REG_A, REG_C, ld8, 1, "LD A,C"),
+    OPCODE(0x7A, REG_A, REG_D, ld8, 1, "LD A,D"),
+    OPCODE(0x7B, REG_A, REG_E, ld8, 1, "LD A,E"),
+    OPCODE(0x7C, REG_A, REG_H, ld8, 1, "LD A,H"),
+    OPCODE(0x7D, REG_A, REG_L, ld8, 1, "LD A,L"),
+    OPCODE(0x7E, REG_A, IND_HL, ld8, 2, "LD A,(HL)"),
+    OPCODE(0x7F, REG_A, REG_A, ld8, 1, "LD A,A"),
+    OPCODE(0xE0, IND_8, REG_A, ld8, 3, "LD ($%02X),A"),
+    OPCODE(0xF0, REG_A, IND_8, ld8, 3, "LD A,($%02X)"),
+    OPCODE(0xEA, IND_16, REG_A, ld8, 4, "LD ($%04X),A"),
+    OPCODE(0xFA, REG_A, IND_16, ld8, 4, "LD A,($%04X)"),
+    OPCODE(0x06, REG_B, IMM_8, ld8, 2, "LD B,$%02X"),
+    OPCODE(0xE2, IND_C, REG_A, ld8, 2, "LD (C),A"),
+    OPCODE(0xF2, REG_C, IMM_8, ld8, 2, "LD C,$%02X"),
+    OPCODE(0x0E, REG_C, IMM_8, ld8, 2, "LD C,$%02X"),
+    OPCODE(0x16, REG_D, IMM_8, ld8, 2, "LD D,$%02X"),
+    OPCODE(0x1E, REG_E, IMM_8, ld8, 2, "LD E,$%02X"),
+    OPCODE(0x26, REG_H, IMM_8, ld8, 2, "LD H,$%02X"),
+    OPCODE(0x2E, REG_L, IMM_8, ld8, 2, "LD L,$%02X"),
+    OPCODE(0x36, IND_HL, IMM_8, ld8, 3, "LD (HL),$%02X"),
+    OPCODE(0x3E, REG_A, IMM_8, ld8, 2, "LD A,$%02X"),
 
-    OPCODE(0x01, ARG_REG_BC, ARG_IMM16, ld16, 3, "LD BC,$%04X"),
-    OPCODE(0x11, ARG_REG_DE, ARG_IMM16, ld16, 3, "LD DE,$%04X"),
-    OPCODE(0x21, ARG_REG_HL, ARG_IMM16, ld16, 3, "LD HL,$%04X"),
-    OPCODE(0x31, ARG_REG_SP, ARG_IMM16, ld16, 3, "LD SP,$%04X"),
-    OPCODE(0x08, ARG_IND_IMM16, ARG_REG_SP, ld16, 5, "LD ($%04X),SP"),
-    OPCODE(0xF9, ARG_REG_SP, ARG_REG_HL, ld16, 2, "LD SP,HL"),
-    OPCODE(0xF8, ARG_IMM8, ARG_NONE, ld_hl_sp, 3, "LD HL,SP+$%02X"),
+    OPCODE(0x01, REG_BC, IMM_16, ld16, 3, "LD BC,$%04X"),
+    OPCODE(0x11, REG_DE, IMM_16, ld16, 3, "LD DE,$%04X"),
+    OPCODE(0x21, REG_HL, IMM_16, ld16, 3, "LD HL,$%04X"),
+    OPCODE(0x31, REG_SP, IMM_16, ld16, 3, "LD SP,$%04X"),
+    OPCODE(0x08, IND_16, REG_SP, ld16, 5, "LD ($%04X),SP"),
+    OPCODE(0xF9, REG_SP, REG_HL, ld16, 2, "LD SP,HL"),
+    OPCODE(0xF8, IMM_8, NONE, ld_hl_sp, 3, "LD HL,SP+$%02X"),
 
-    OPCODE(0x80, ARG_REG_B, ARG_NONE, add_a, 1, "ADD A,B"),
-    OPCODE(0x81, ARG_REG_C, ARG_NONE, add_a, 1, "ADD A,C"),
-    OPCODE(0x82, ARG_REG_D, ARG_NONE, add_a, 1, "ADD A,D"),
-    OPCODE(0x83, ARG_REG_E, ARG_NONE, add_a, 1, "ADD A,E"),
-    OPCODE(0x84, ARG_REG_H, ARG_NONE, add_a, 1, "ADD A,H"),
-    OPCODE(0x85, ARG_REG_L, ARG_NONE, add_a, 1, "ADD A,L"),
-    OPCODE(0x86, ARG_IND_HL, ARG_NONE, add_a, 2, "ADD A,(HL)"),
-    OPCODE(0x87, ARG_REG_A, ARG_NONE, add_a, 1, "ADD A,A"),
-    OPCODE(0xC6, ARG_IMM8, ARG_NONE, add_a, 2, "ADD A,$%02X"),
+    OPCODE(0x80, REG_B, NONE, add_a, 1, "ADD A,B"),
+    OPCODE(0x81, REG_C, NONE, add_a, 1, "ADD A,C"),
+    OPCODE(0x82, REG_D, NONE, add_a, 1, "ADD A,D"),
+    OPCODE(0x83, REG_E, NONE, add_a, 1, "ADD A,E"),
+    OPCODE(0x84, REG_H, NONE, add_a, 1, "ADD A,H"),
+    OPCODE(0x85, REG_L, NONE, add_a, 1, "ADD A,L"),
+    OPCODE(0x86, IND_HL, NONE, add_a, 2, "ADD A,(HL)"),
+    OPCODE(0x87, REG_A, NONE, add_a, 1, "ADD A,A"),
+    OPCODE(0xC6, IMM_8, NONE, add_a, 2, "ADD A,$%02X"),
 
-    OPCODE(0xE8, ARG_IMM8, ARG_NONE, add_sp, 4, "ADD SP,$%02X"),
-    OPCODE(0x09, ARG_REG_BC, ARG_NONE, add_hl, 2, "ADD HL,BC"),
-    OPCODE(0x19, ARG_REG_DE, ARG_NONE, add_hl, 2, "ADD HL,DE"),
-    OPCODE(0x29, ARG_REG_HL, ARG_NONE, add_hl, 2, "ADD HL,HL"),
-    OPCODE(0x39, ARG_REG_SP, ARG_NONE, add_hl, 2, "ADD HL,SP"),
+    OPCODE(0xE8, IMM_8, NONE, add_sp, 4, "ADD SP,$%02X"),
+    OPCODE(0x09, REG_BC, NONE, add_hl, 2, "ADD HL,BC"),
+    OPCODE(0x19, REG_DE, NONE, add_hl, 2, "ADD HL,DE"),
+    OPCODE(0x29, REG_HL, NONE, add_hl, 2, "ADD HL,HL"),
+    OPCODE(0x39, REG_SP, NONE, add_hl, 2, "ADD HL,SP"),
 
-    OPCODE(0x88, ARG_REG_B, ARG_NONE, adc8, 1, "ADC A,B"),
-    OPCODE(0x89, ARG_REG_C, ARG_NONE, adc8, 1, "ADC A,C"),
-    OPCODE(0x8A, ARG_REG_D, ARG_NONE, adc8, 1, "ADC A,D"),
-    OPCODE(0x8B, ARG_REG_E, ARG_NONE, adc8, 1, "ADC A,E"),
-    OPCODE(0x8C, ARG_REG_H, ARG_NONE, adc8, 1, "ADC A,H"),
-    OPCODE(0x8D, ARG_REG_L, ARG_NONE, adc8, 1, "ADC A,L"),
-    OPCODE(0x8E, ARG_IND_HL, ARG_NONE, adc8, 2, "ADC A,(HL)"),
-    OPCODE(0x8F, ARG_REG_A, ARG_NONE, adc8, 1, "ADC A,A"),
-    OPCODE(0xCE, ARG_IMM8, ARG_NONE, adc8, 2, "ADC A,$%02X"),
+    OPCODE(0x88, REG_B, NONE, adc8, 1, "ADC A,B"),
+    OPCODE(0x89, REG_C, NONE, adc8, 1, "ADC A,C"),
+    OPCODE(0x8A, REG_D, NONE, adc8, 1, "ADC A,D"),
+    OPCODE(0x8B, REG_E, NONE, adc8, 1, "ADC A,E"),
+    OPCODE(0x8C, REG_H, NONE, adc8, 1, "ADC A,H"),
+    OPCODE(0x8D, REG_L, NONE, adc8, 1, "ADC A,L"),
+    OPCODE(0x8E, IND_HL, NONE, adc8, 2, "ADC A,(HL)"),
+    OPCODE(0x8F, REG_A, NONE, adc8, 1, "ADC A,A"),
+    OPCODE(0xCE, IMM_8, NONE, adc8, 2, "ADC A,$%02X"),
 
-    OPCODE(0x90, ARG_REG_B, ARG_NONE, sub8, 1, "SUB A,B"),
-    OPCODE(0x91, ARG_REG_C, ARG_NONE, sub8, 1, "SUB A,C"),
-    OPCODE(0x92, ARG_REG_D, ARG_NONE, sub8, 1, "SUB A,D"),
-    OPCODE(0x93, ARG_REG_E, ARG_NONE, sub8, 1, "SUB A,E"),
-    OPCODE(0x94, ARG_REG_H, ARG_NONE, sub8, 1, "SUB A,H"),
-    OPCODE(0x95, ARG_REG_L, ARG_NONE, sub8, 1, "SUB A,L"),
-    OPCODE(0x96, ARG_IND_HL, ARG_NONE, sub8, 2, "SUB A,(HL)"),
-    OPCODE(0x97, ARG_REG_A, ARG_NONE, sub8, 1, "SUB A,A"),
-    OPCODE(0xD6, ARG_IMM8, ARG_NONE, sub8, 2, "SUB A,$%02X"),
+    OPCODE(0x90, REG_B, NONE, sub8, 1, "SUB A,B"),
+    OPCODE(0x91, REG_C, NONE, sub8, 1, "SUB A,C"),
+    OPCODE(0x92, REG_D, NONE, sub8, 1, "SUB A,D"),
+    OPCODE(0x93, REG_E, NONE, sub8, 1, "SUB A,E"),
+    OPCODE(0x94, REG_H, NONE, sub8, 1, "SUB A,H"),
+    OPCODE(0x95, REG_L, NONE, sub8, 1, "SUB A,L"),
+    OPCODE(0x96, IND_HL, NONE, sub8, 2, "SUB A,(HL)"),
+    OPCODE(0x97, REG_A, NONE, sub8, 1, "SUB A,A"),
+    OPCODE(0xD6, IMM_8, NONE, sub8, 2, "SUB A,$%02X"),
 
-    OPCODE(0x98, ARG_REG_B, ARG_NONE, sbc8, 1, "SBC A,B"),
-    OPCODE(0x99, ARG_REG_C, ARG_NONE, sbc8, 1, "SBC A,C"),
-    OPCODE(0x9A, ARG_REG_D, ARG_NONE, sbc8, 1, "SBC A,D"),
-    OPCODE(0x9B, ARG_REG_E, ARG_NONE, sbc8, 1, "SBC A,E"),
-    OPCODE(0x9C, ARG_REG_H, ARG_NONE, sbc8, 1, "SBC A,H"),
-    OPCODE(0x9D, ARG_REG_L, ARG_NONE, sbc8, 1, "SBC A,L"),
-    OPCODE(0x9E, ARG_IND_HL, ARG_NONE, sbc8, 2, "SBC A,(HL)"),
-    OPCODE(0x9F, ARG_REG_A, ARG_NONE, sbc8, 1, "SBC A,A"),
-    OPCODE(0xDE, ARG_IMM8, ARG_NONE, sbc8, 2, "SBC A,$%02X"),
+    OPCODE(0x98, REG_B, NONE, sbc8, 1, "SBC A,B"),
+    OPCODE(0x99, REG_C, NONE, sbc8, 1, "SBC A,C"),
+    OPCODE(0x9A, REG_D, NONE, sbc8, 1, "SBC A,D"),
+    OPCODE(0x9B, REG_E, NONE, sbc8, 1, "SBC A,E"),
+    OPCODE(0x9C, REG_H, NONE, sbc8, 1, "SBC A,H"),
+    OPCODE(0x9D, REG_L, NONE, sbc8, 1, "SBC A,L"),
+    OPCODE(0x9E, IND_HL, NONE, sbc8, 2, "SBC A,(HL)"),
+    OPCODE(0x9F, REG_A, NONE, sbc8, 1, "SBC A,A"),
+    OPCODE(0xDE, IMM_8, NONE, sbc8, 2, "SBC A,$%02X"),
 
-    OPCODE(0xA0, ARG_REG_B, ARG_NONE, and8, 1, "AND B"),
-    OPCODE(0xA1, ARG_REG_C, ARG_NONE, and8, 1, "AND C"),
-    OPCODE(0xA2, ARG_REG_D, ARG_NONE, and8, 1, "AND D"),
-    OPCODE(0xA3, ARG_REG_E, ARG_NONE, and8, 1, "AND E"),
-    OPCODE(0xA4, ARG_REG_H, ARG_NONE, and8, 1, "AND H"),
-    OPCODE(0xA5, ARG_REG_L, ARG_NONE, and8, 1, "AND L"),
-    OPCODE(0xA6, ARG_IND_HL, ARG_NONE, and8, 2, "AND (HL)"),
-    OPCODE(0xA7, ARG_REG_A, ARG_NONE, and8, 1, "AND A"),
-    OPCODE(0xE6, ARG_IMM8, ARG_NONE, and8, 2, "AND $%02X"),
+    OPCODE(0xA0, REG_B, NONE, and8, 1, "AND B"),
+    OPCODE(0xA1, REG_C, NONE, and8, 1, "AND C"),
+    OPCODE(0xA2, REG_D, NONE, and8, 1, "AND D"),
+    OPCODE(0xA3, REG_E, NONE, and8, 1, "AND E"),
+    OPCODE(0xA4, REG_H, NONE, and8, 1, "AND H"),
+    OPCODE(0xA5, REG_L, NONE, and8, 1, "AND L"),
+    OPCODE(0xA6, IND_HL, NONE, and8, 2, "AND (HL)"),
+    OPCODE(0xA7, REG_A, NONE, and8, 1, "AND A"),
+    OPCODE(0xE6, IMM_8, NONE, and8, 2, "AND $%02X"),
 
-    OPCODE(0xA8, ARG_REG_B, ARG_NONE, xor8, 1, "XOR B"),
-    OPCODE(0xA9, ARG_REG_C, ARG_NONE, xor8, 1, "XOR C"),
-    OPCODE(0xAA, ARG_REG_D, ARG_NONE, xor8, 1, "XOR D"),
-    OPCODE(0xAB, ARG_REG_E, ARG_NONE, xor8, 1, "XOR E"),
-    OPCODE(0xAC, ARG_REG_H, ARG_NONE, xor8, 1, "XOR H"),
-    OPCODE(0xAD, ARG_REG_L, ARG_NONE, xor8, 1, "XOR L"),
-    OPCODE(0xAE, ARG_IND_HL, ARG_NONE, xor8, 2, "XOR (HL)"),
-    OPCODE(0xAF, ARG_REG_A, ARG_NONE, xor8, 1, "XOR A"),
-    OPCODE(0xEE, ARG_IMM8, ARG_NONE, xor8, 2, "XOR $%02X"),
+    OPCODE(0xA8, REG_B, NONE, xor8, 1, "XOR B"),
+    OPCODE(0xA9, REG_C, NONE, xor8, 1, "XOR C"),
+    OPCODE(0xAA, REG_D, NONE, xor8, 1, "XOR D"),
+    OPCODE(0xAB, REG_E, NONE, xor8, 1, "XOR E"),
+    OPCODE(0xAC, REG_H, NONE, xor8, 1, "XOR H"),
+    OPCODE(0xAD, REG_L, NONE, xor8, 1, "XOR L"),
+    OPCODE(0xAE, IND_HL, NONE, xor8, 2, "XOR (HL)"),
+    OPCODE(0xAF, REG_A, NONE, xor8, 1, "XOR A"),
+    OPCODE(0xEE, IMM_8, NONE, xor8, 2, "XOR $%02X"),
 
-    OPCODE(0xB0, ARG_REG_B, ARG_NONE, or8, 1, "OR B"),
-    OPCODE(0xB1, ARG_REG_C, ARG_NONE, or8, 1, "OR C"),
-    OPCODE(0xB2, ARG_REG_D, ARG_NONE, or8, 1, "OR D"),
-    OPCODE(0xB3, ARG_REG_E, ARG_NONE, or8, 1, "OR E"),
-    OPCODE(0xB4, ARG_REG_H, ARG_NONE, or8, 1, "OR H"),
-    OPCODE(0xB5, ARG_REG_L, ARG_NONE, or8, 1, "OR L"),
-    OPCODE(0xB6, ARG_IND_HL, ARG_NONE, or8, 2, "OR (HL)"),
-    OPCODE(0xB7, ARG_REG_A, ARG_NONE, or8, 1, "OR A"),
-    OPCODE(0xF6, ARG_IMM8, ARG_NONE, or8, 2, "OR $%02X"),
+    OPCODE(0xB0, REG_B, NONE, or8, 1, "OR B"),
+    OPCODE(0xB1, REG_C, NONE, or8, 1, "OR C"),
+    OPCODE(0xB2, REG_D, NONE, or8, 1, "OR D"),
+    OPCODE(0xB3, REG_E, NONE, or8, 1, "OR E"),
+    OPCODE(0xB4, REG_H, NONE, or8, 1, "OR H"),
+    OPCODE(0xB5, REG_L, NONE, or8, 1, "OR L"),
+    OPCODE(0xB6, IND_HL, NONE, or8, 2, "OR (HL)"),
+    OPCODE(0xB7, REG_A, NONE, or8, 1, "OR A"),
+    OPCODE(0xF6, IMM_8, NONE, or8, 2, "OR $%02X"),
 
-    OPCODE(0xB8, ARG_REG_B, ARG_NONE, cp8, 1, "CP B"),
-    OPCODE(0xB9, ARG_REG_C, ARG_NONE, cp8, 1, "CP C"),
-    OPCODE(0xBA, ARG_REG_D, ARG_NONE, cp8, 1, "CP D"),
-    OPCODE(0xBB, ARG_REG_E, ARG_NONE, cp8, 1, "CP E"),
-    OPCODE(0xBC, ARG_REG_H, ARG_NONE, cp8, 1, "CP H"),
-    OPCODE(0xBD, ARG_REG_L, ARG_NONE, cp8, 1, "CP L"),
-    OPCODE(0xBE, ARG_IND_HL, ARG_NONE, cp8, 2, "CP (HL)"),
-    OPCODE(0xBF, ARG_REG_A, ARG_NONE, cp8, 1, "CP A"),
-    OPCODE(0xFE, ARG_IMM8, ARG_NONE, cp8, 2, "CP $%02X"),
+    OPCODE(0xB8, REG_B, NONE, cp8, 1, "CP B"),
+    OPCODE(0xB9, REG_C, NONE, cp8, 1, "CP C"),
+    OPCODE(0xBA, REG_D, NONE, cp8, 1, "CP D"),
+    OPCODE(0xBB, REG_E, NONE, cp8, 1, "CP E"),
+    OPCODE(0xBC, REG_H, NONE, cp8, 1, "CP H"),
+    OPCODE(0xBD, REG_L, NONE, cp8, 1, "CP L"),
+    OPCODE(0xBE, IND_HL, NONE, cp8, 2, "CP (HL)"),
+    OPCODE(0xBF, REG_A, NONE, cp8, 1, "CP A"),
+    OPCODE(0xFE, IMM_8, NONE, cp8, 2, "CP $%02X"),
 
-    OPCODE(0xC1, ARG_REG_BC, ARG_NONE, pop16, 3, "POP BC"),
-    OPCODE(0xD1, ARG_REG_DE, ARG_NONE, pop16, 3, "POP DE"),
-    OPCODE(0xE1, ARG_REG_HL, ARG_NONE, pop16, 3, "POP HL"),
-    OPCODE(0xF1, ARG_REG_AF, ARG_NONE, pop16, 3, "POP AF"),
+    OPCODE(0xC1, REG_BC, NONE, pop16, 3, "POP BC"),
+    OPCODE(0xD1, REG_DE, NONE, pop16, 3, "POP DE"),
+    OPCODE(0xE1, REG_HL, NONE, pop16, 3, "POP HL"),
+    OPCODE(0xF1, REG_AF, NONE, pop16, 3, "POP AF"),
 
-    OPCODE(0xC5, ARG_REG_BC, ARG_NONE, push16, 4, "PUSH BC"),
-    OPCODE(0xD5, ARG_REG_DE, ARG_NONE, push16, 4, "PUSH DE"),
-    OPCODE(0xE5, ARG_REG_HL, ARG_NONE, push16, 4, "PUSH HL"),
-    OPCODE(0xF5, ARG_REG_AF, ARG_NONE, push16, 4, "PUSH AF"),
+    OPCODE(0xC5, REG_BC, NONE, push16, 4, "PUSH BC"),
+    OPCODE(0xD5, REG_DE, NONE, push16, 4, "PUSH DE"),
+    OPCODE(0xE5, REG_HL, NONE, push16, 4, "PUSH HL"),
+    OPCODE(0xF5, REG_AF, NONE, push16, 4, "PUSH AF"),
 
-    OPCODE(0x18, ARG_IMM8, ARG_NONE, jr8, 2, "JR $%02X"),
-    OPCODE(0x28, ARG_FLAG_ZERO, ARG_IMM8, jr8_if, 2, "JR Z,$%02X"),
-    OPCODE(0x38, ARG_FLAG_CARRY, ARG_IMM8, jr8_if, 2, "JR C,$%02X"),
-    OPCODE(0x20, ARG_FLAG_ZERO, ARG_IMM8, jr8_ifn, 2, "JR NZ,$%02X"),
-    OPCODE(0x30, ARG_FLAG_CARRY, ARG_IMM8, jr8_ifn, 2, "JR NC,$%02X"),
+    OPCODE(0x18, IMM_8, NONE, jr8, 2, "JR $%02X"),
+    OPCODE(0x28, FLAG_ZERO, IMM_8, jr8_if, 2, "JR Z,$%02X"),
+    OPCODE(0x38, FLAG_CARRY, IMM_8, jr8_if, 2, "JR C,$%02X"),
+    OPCODE(0x20, FLAG_ZERO, IMM_8, jr8_ifn, 2, "JR NZ,$%02X"),
+    OPCODE(0x30, FLAG_CARRY, IMM_8, jr8_ifn, 2, "JR NC,$%02X"),
 
-    OPCODE(0xC3, ARG_IMM16, ARG_NONE, jp16, 4, "JP $%04X"),
-    OPCODE(0xE9, ARG_REG_HL, ARG_NONE, jp16, 1, "JP HL"),
-    OPCODE(0xCA, ARG_FLAG_ZERO, ARG_IMM16, jp16_if, 3, "JP Z,$%04X"),
-    OPCODE(0xDA, ARG_FLAG_CARRY, ARG_IMM16, jp16_if, 3, "JP C,$%04X"),
-    OPCODE(0xC2, ARG_FLAG_ZERO, ARG_IMM16, jp16_ifn, 3, "JP NZ,$%04X"),
-    OPCODE(0xD2, ARG_FLAG_CARRY, ARG_IMM16, jp16_ifn, 3, "JP NC,$%04X"),
+    OPCODE(0xC3, IMM_16, NONE, jp16, 4, "JP $%04X"),
+    OPCODE(0xE9, REG_HL, NONE, jp16, 1, "JP HL"),
+    OPCODE(0xCA, FLAG_ZERO, IMM_16, jp16_if, 3, "JP Z,$%04X"),
+    OPCODE(0xDA, FLAG_CARRY, IMM_16, jp16_if, 3, "JP C,$%04X"),
+    OPCODE(0xC2, FLAG_ZERO, IMM_16, jp16_ifn, 3, "JP NZ,$%04X"),
+    OPCODE(0xD2, FLAG_CARRY, IMM_16, jp16_ifn, 3, "JP NC,$%04X"),
 
-    OPCODE(0xCD, ARG_IMM16, ARG_NONE, call, 6, "CALL $%04X"),
-    OPCODE(0xCC, ARG_FLAG_ZERO, ARG_IMM16, call_if, 3, "CALL Z,$%04X"),
-    OPCODE(0xDC, ARG_FLAG_CARRY, ARG_IMM16, call_if, 3, "CALL C,$%04X"),
-    OPCODE(0xC4, ARG_FLAG_ZERO, ARG_IMM16, call_ifn, 3, "CALL NZ,$%04X"),
-    OPCODE(0xD4, ARG_FLAG_CARRY, ARG_IMM16, call_ifn, 3, "CALL NC,$%04X"),
+    OPCODE(0xCD, IMM_16, NONE, call, 6, "CALL $%04X"),
+    OPCODE(0xCC, FLAG_ZERO, IMM_16, call_if, 3, "CALL Z,$%04X"),
+    OPCODE(0xDC, FLAG_CARRY, IMM_16, call_if, 3, "CALL C,$%04X"),
+    OPCODE(0xC4, FLAG_ZERO, IMM_16, call_ifn, 3, "CALL NZ,$%04X"),
+    OPCODE(0xD4, FLAG_CARRY, IMM_16, call_ifn, 3, "CALL NC,$%04X"),
 
-    OPCODE(0xC9, ARG_NONE, ARG_NONE, ret, 4, "RET"),
-    OPCODE(0xD9, ARG_NONE, ARG_NONE, reti, 4, "RETI"),
-    OPCODE(0xC8, ARG_FLAG_ZERO, ARG_NONE, ret_if, 2, "RET Z"),
-    OPCODE(0xD8, ARG_FLAG_CARRY, ARG_NONE, ret_if, 2, "RET C"),
-    OPCODE(0xC0, ARG_FLAG_ZERO, ARG_NONE, ret_ifn, 2, "RET NZ"),
-    OPCODE(0xD0, ARG_FLAG_CARRY, ARG_NONE, ret_ifn, 2, "RET NC"),
+    OPCODE(0xC9, NONE, NONE, ret, 4, "RET"),
+    OPCODE(0xD9, NONE, NONE, reti, 4, "RETI"),
+    OPCODE(0xC8, FLAG_ZERO, NONE, ret_if, 2, "RET Z"),
+    OPCODE(0xD8, FLAG_CARRY, NONE, ret_if, 2, "RET C"),
+    OPCODE(0xC0, FLAG_ZERO, NONE, ret_ifn, 2, "RET NZ"),
+    OPCODE(0xD0, FLAG_CARRY, NONE, ret_ifn, 2, "RET NC"),
 
-    OPCODE(0xC7, ARG_RST_0, ARG_NONE, rst, 4, "RST 0"),
-    OPCODE(0xCF, ARG_RST_1, ARG_NONE, rst, 4, "RST 1"),
-    OPCODE(0xD7, ARG_RST_2, ARG_NONE, rst, 4, "RST 2"),
-    OPCODE(0xDF, ARG_RST_3, ARG_NONE, rst, 4, "RST 3"),
-    OPCODE(0xE7, ARG_RST_4, ARG_NONE, rst, 4, "RST 4"),
-    OPCODE(0xEF, ARG_RST_5, ARG_NONE, rst, 4, "RST 5"),
-    OPCODE(0xF7, ARG_RST_6, ARG_NONE, rst, 4, "RST 6"),
-    OPCODE(0xFF, ARG_RST_7, ARG_NONE, rst, 4, "RST 7"),
+    OPCODE(0xC7, RST_0, NONE, rst, 4, "RST 0"),
+    OPCODE(0xCF, RST_1, NONE, rst, 4, "RST 1"),
+    OPCODE(0xD7, RST_2, NONE, rst, 4, "RST 2"),
+    OPCODE(0xDF, RST_3, NONE, rst, 4, "RST 3"),
+    OPCODE(0xE7, RST_4, NONE, rst, 4, "RST 4"),
+    OPCODE(0xEF, RST_5, NONE, rst, 4, "RST 5"),
+    OPCODE(0xF7, RST_6, NONE, rst, 4, "RST 6"),
+    OPCODE(0xFF, RST_7, NONE, rst, 4, "RST 7"),
 
-    OPCODE(0x07, ARG_REG_A, ARG_NONE, rlca, 1, "RLCA"),
-    OPCODE(0x17, ARG_REG_A, ARG_NONE, rla, 1, "RLA"),
-    OPCODE(0x0F, ARG_REG_A, ARG_NONE, rrca, 1, "RRCA"),
-    OPCODE(0x1F, ARG_REG_A, ARG_NONE, rra, 1, "RRA"),
+    OPCODE(0x07, REG_A, NONE, rlca, 1, "RLCA"),
+    OPCODE(0x17, REG_A, NONE, rla, 1, "RLA"),
+    OPCODE(0x0F, REG_A, NONE, rrca, 1, "RRCA"),
+    OPCODE(0x1F, REG_A, NONE, rra, 1, "RRA"),
 };
 
 const Instruction cb_opcodes[256] = {
-    OPCODE(0x00, ARG_REG_B, ARG_NONE, rlc, 2, "RLC B"),
-    OPCODE(0x01, ARG_REG_C, ARG_NONE, rlc, 2, "RLC C"),
-    OPCODE(0x02, ARG_REG_D, ARG_NONE, rlc, 2, "RLC D"),
-    OPCODE(0x03, ARG_REG_E, ARG_NONE, rlc, 2, "RLC E"),
-    OPCODE(0x04, ARG_REG_H, ARG_NONE, rlc, 2, "RLC H"),
-    OPCODE(0x05, ARG_REG_L, ARG_NONE, rlc, 2, "RLC L"),
-    OPCODE(0x06, ARG_IND_HL, ARG_NONE, rlc, 4, "RLC (HL)"),
-    OPCODE(0x07, ARG_REG_A, ARG_NONE, rlc, 2, "RLC A"),
+    OPCODE(0x00, REG_B, NONE, rlc, 2, "RLC B"),
+    OPCODE(0x01, REG_C, NONE, rlc, 2, "RLC C"),
+    OPCODE(0x02, REG_D, NONE, rlc, 2, "RLC D"),
+    OPCODE(0x03, REG_E, NONE, rlc, 2, "RLC E"),
+    OPCODE(0x04, REG_H, NONE, rlc, 2, "RLC H"),
+    OPCODE(0x05, REG_L, NONE, rlc, 2, "RLC L"),
+    OPCODE(0x06, IND_HL, NONE, rlc, 4, "RLC (HL)"),
+    OPCODE(0x07, REG_A, NONE, rlc, 2, "RLC A"),
 
-    OPCODE(0x08, ARG_REG_B, ARG_NONE, rrc, 2, "RRC B"),
-    OPCODE(0x09, ARG_REG_C, ARG_NONE, rrc, 2, "RRC C"),
-    OPCODE(0x0A, ARG_REG_D, ARG_NONE, rrc, 2, "RRC D"),
-    OPCODE(0x0B, ARG_REG_E, ARG_NONE, rrc, 2, "RRC E"),
-    OPCODE(0x0C, ARG_REG_H, ARG_NONE, rrc, 2, "RRC H"),
-    OPCODE(0x0D, ARG_REG_L, ARG_NONE, rrc, 2, "RRC L"),
-    OPCODE(0x0E, ARG_IND_HL, ARG_NONE, rrc, 4, "RRC (HL)"),
-    OPCODE(0x0F, ARG_REG_A, ARG_NONE, rrc, 2, "RRC A"),
+    OPCODE(0x08, REG_B, NONE, rrc, 2, "RRC B"),
+    OPCODE(0x09, REG_C, NONE, rrc, 2, "RRC C"),
+    OPCODE(0x0A, REG_D, NONE, rrc, 2, "RRC D"),
+    OPCODE(0x0B, REG_E, NONE, rrc, 2, "RRC E"),
+    OPCODE(0x0C, REG_H, NONE, rrc, 2, "RRC H"),
+    OPCODE(0x0D, REG_L, NONE, rrc, 2, "RRC L"),
+    OPCODE(0x0E, IND_HL, NONE, rrc, 4, "RRC (HL)"),
+    OPCODE(0x0F, REG_A, NONE, rrc, 2, "RRC A"),
 
-    OPCODE(0x10, ARG_REG_B, ARG_NONE, rl, 2, "RL B"),
-    OPCODE(0x11, ARG_REG_C, ARG_NONE, rl, 2, "RL C"),
-    OPCODE(0x12, ARG_REG_D, ARG_NONE, rl, 2, "RL D"),
-    OPCODE(0x13, ARG_REG_E, ARG_NONE, rl, 2, "RL E"),
-    OPCODE(0x14, ARG_REG_H, ARG_NONE, rl, 2, "RL H"),
-    OPCODE(0x15, ARG_REG_L, ARG_NONE, rl, 2, "RL L"),
-    OPCODE(0x16, ARG_IND_HL, ARG_NONE, rl, 4, "RL (HL)"),
-    OPCODE(0x17, ARG_REG_A, ARG_NONE, rl, 2, "RL A"),
+    OPCODE(0x10, REG_B, NONE, rl, 2, "RL B"),
+    OPCODE(0x11, REG_C, NONE, rl, 2, "RL C"),
+    OPCODE(0x12, REG_D, NONE, rl, 2, "RL D"),
+    OPCODE(0x13, REG_E, NONE, rl, 2, "RL E"),
+    OPCODE(0x14, REG_H, NONE, rl, 2, "RL H"),
+    OPCODE(0x15, REG_L, NONE, rl, 2, "RL L"),
+    OPCODE(0x16, IND_HL, NONE, rl, 4, "RL (HL)"),
+    OPCODE(0x17, REG_A, NONE, rl, 2, "RL A"),
 
-    OPCODE(0x18, ARG_REG_B, ARG_NONE, rr, 2, "RR B"),
-    OPCODE(0x19, ARG_REG_C, ARG_NONE, rr, 2, "RR C"),
-    OPCODE(0x1A, ARG_REG_D, ARG_NONE, rr, 2, "RR D"),
-    OPCODE(0x1B, ARG_REG_E, ARG_NONE, rr, 2, "RR E"),
-    OPCODE(0x1C, ARG_REG_H, ARG_NONE, rr, 2, "RR H"),
-    OPCODE(0x1D, ARG_REG_L, ARG_NONE, rr, 2, "RR L"),
-    OPCODE(0x1E, ARG_IND_HL, ARG_NONE, rr, 4, "RR (HL)"),
-    OPCODE(0x1F, ARG_REG_A, ARG_NONE, rr, 2, "RR A"),
+    OPCODE(0x18, REG_B, NONE, rr, 2, "RR B"),
+    OPCODE(0x19, REG_C, NONE, rr, 2, "RR C"),
+    OPCODE(0x1A, REG_D, NONE, rr, 2, "RR D"),
+    OPCODE(0x1B, REG_E, NONE, rr, 2, "RR E"),
+    OPCODE(0x1C, REG_H, NONE, rr, 2, "RR H"),
+    OPCODE(0x1D, REG_L, NONE, rr, 2, "RR L"),
+    OPCODE(0x1E, IND_HL, NONE, rr, 4, "RR (HL)"),
+    OPCODE(0x1F, REG_A, NONE, rr, 2, "RR A"),
 
-    OPCODE(0x20, ARG_REG_B, ARG_NONE, sla, 2, "SLA B"),
-    OPCODE(0x21, ARG_REG_C, ARG_NONE, sla, 2, "SLA C"),
-    OPCODE(0x22, ARG_REG_D, ARG_NONE, sla, 2, "SLA D"),
-    OPCODE(0x23, ARG_REG_E, ARG_NONE, sla, 2, "SLA E"),
-    OPCODE(0x24, ARG_REG_H, ARG_NONE, sla, 2, "SLA H"),
-    OPCODE(0x25, ARG_REG_L, ARG_NONE, sla, 2, "SLA L"),
-    OPCODE(0x26, ARG_IND_HL, ARG_NONE, sla, 4, "SLA (HL)"),
-    OPCODE(0x27, ARG_REG_A, ARG_NONE, sla, 2, "SLA A"),
+    OPCODE(0x20, REG_B, NONE, sla, 2, "SLA B"),
+    OPCODE(0x21, REG_C, NONE, sla, 2, "SLA C"),
+    OPCODE(0x22, REG_D, NONE, sla, 2, "SLA D"),
+    OPCODE(0x23, REG_E, NONE, sla, 2, "SLA E"),
+    OPCODE(0x24, REG_H, NONE, sla, 2, "SLA H"),
+    OPCODE(0x25, REG_L, NONE, sla, 2, "SLA L"),
+    OPCODE(0x26, IND_HL, NONE, sla, 4, "SLA (HL)"),
+    OPCODE(0x27, REG_A, NONE, sla, 2, "SLA A"),
 
-    OPCODE(0x28, ARG_REG_B, ARG_NONE, sra, 2, "SRA B"),
-    OPCODE(0x29, ARG_REG_C, ARG_NONE, sra, 2, "SRA C"),
-    OPCODE(0x2A, ARG_REG_D, ARG_NONE, sra, 2, "SRA D"),
-    OPCODE(0x2B, ARG_REG_E, ARG_NONE, sra, 2, "SRA E"),
-    OPCODE(0x2C, ARG_REG_H, ARG_NONE, sra, 2, "SRA H"),
-    OPCODE(0x2D, ARG_REG_L, ARG_NONE, sra, 2, "SRA L"),
-    OPCODE(0x2E, ARG_IND_HL, ARG_NONE, sra, 4, "SRA (HL)"),
-    OPCODE(0x2F, ARG_REG_A, ARG_NONE, sra, 2, "SRA A"),
+    OPCODE(0x28, REG_B, NONE, sra, 2, "SRA B"),
+    OPCODE(0x29, REG_C, NONE, sra, 2, "SRA C"),
+    OPCODE(0x2A, REG_D, NONE, sra, 2, "SRA D"),
+    OPCODE(0x2B, REG_E, NONE, sra, 2, "SRA E"),
+    OPCODE(0x2C, REG_H, NONE, sra, 2, "SRA H"),
+    OPCODE(0x2D, REG_L, NONE, sra, 2, "SRA L"),
+    OPCODE(0x2E, IND_HL, NONE, sra, 4, "SRA (HL)"),
+    OPCODE(0x2F, REG_A, NONE, sra, 2, "SRA A"),
 
-    OPCODE(0x30, ARG_REG_B, ARG_NONE, swap, 2, "SWAP B"),
-    OPCODE(0x31, ARG_REG_C, ARG_NONE, swap, 2, "SWAP C"),
-    OPCODE(0x32, ARG_REG_D, ARG_NONE, swap, 2, "SWAP D"),
-    OPCODE(0x33, ARG_REG_E, ARG_NONE, swap, 2, "SWAP E"),
-    OPCODE(0x34, ARG_REG_H, ARG_NONE, swap, 2, "SWAP H"),
-    OPCODE(0x35, ARG_REG_L, ARG_NONE, swap, 2, "SWAP L"),
-    OPCODE(0x36, ARG_IND_HL, ARG_NONE, swap, 4, "SWAP (HL)"),
-    OPCODE(0x37, ARG_REG_A, ARG_NONE, swap, 2, "SWAP A"),
+    OPCODE(0x30, REG_B, NONE, swap, 2, "SWAP B"),
+    OPCODE(0x31, REG_C, NONE, swap, 2, "SWAP C"),
+    OPCODE(0x32, REG_D, NONE, swap, 2, "SWAP D"),
+    OPCODE(0x33, REG_E, NONE, swap, 2, "SWAP E"),
+    OPCODE(0x34, REG_H, NONE, swap, 2, "SWAP H"),
+    OPCODE(0x35, REG_L, NONE, swap, 2, "SWAP L"),
+    OPCODE(0x36, IND_HL, NONE, swap, 4, "SWAP (HL)"),
+    OPCODE(0x37, REG_A, NONE, swap, 2, "SWAP A"),
 
-    OPCODE(0x38, ARG_REG_B, ARG_NONE, srl, 2, "SRL B"),
-    OPCODE(0x39, ARG_REG_C, ARG_NONE, srl, 2, "SRL C"),
-    OPCODE(0x3A, ARG_REG_D, ARG_NONE, srl, 2, "SRL D"),
-    OPCODE(0x3B, ARG_REG_E, ARG_NONE, srl, 2, "SRL E"),
-    OPCODE(0x3C, ARG_REG_H, ARG_NONE, srl, 2, "SRL H"),
-    OPCODE(0x3D, ARG_REG_L, ARG_NONE, srl, 2, "SRL L"),
-    OPCODE(0x3E, ARG_IND_HL, ARG_NONE, srl, 4, "SRL (HL)"),
-    OPCODE(0x3F, ARG_REG_A, ARG_NONE, srl, 2, "SRL A"),
+    OPCODE(0x38, REG_B, NONE, srl, 2, "SRL B"),
+    OPCODE(0x39, REG_C, NONE, srl, 2, "SRL C"),
+    OPCODE(0x3A, REG_D, NONE, srl, 2, "SRL D"),
+    OPCODE(0x3B, REG_E, NONE, srl, 2, "SRL E"),
+    OPCODE(0x3C, REG_H, NONE, srl, 2, "SRL H"),
+    OPCODE(0x3D, REG_L, NONE, srl, 2, "SRL L"),
+    OPCODE(0x3E, IND_HL, NONE, srl, 4, "SRL (HL)"),
+    OPCODE(0x3F, REG_A, NONE, srl, 2, "SRL A"),
 
-    OPCODE(0x40, ARG_BIT_0, ARG_REG_B, bit, 2, "BIT 0,B"),
-    OPCODE(0x41, ARG_BIT_0, ARG_REG_C, bit, 2, "BIT 0,C"),
-    OPCODE(0x42, ARG_BIT_0, ARG_REG_D, bit, 2, "BIT 0,D"),
-    OPCODE(0x43, ARG_BIT_0, ARG_REG_E, bit, 2, "BIT 0,E"),
-    OPCODE(0x44, ARG_BIT_0, ARG_REG_H, bit, 2, "BIT 0,H"),
-    OPCODE(0x45, ARG_BIT_0, ARG_REG_L, bit, 2, "BIT 0,L"),
-    OPCODE(0x46, ARG_BIT_0, ARG_IND_HL, bit, 3, "BIT 0,(HL)"),
-    OPCODE(0x47, ARG_BIT_0, ARG_REG_A, bit, 2, "BIT 0,A"),
-    OPCODE(0x48, ARG_BIT_1, ARG_REG_B, bit, 2, "BIT 1,B"),
-    OPCODE(0x49, ARG_BIT_1, ARG_REG_C, bit, 2, "BIT 1,C"),
-    OPCODE(0x4A, ARG_BIT_1, ARG_REG_D, bit, 2, "BIT 1,D"),
-    OPCODE(0x4B, ARG_BIT_1, ARG_REG_E, bit, 2, "BIT 1,E"),
-    OPCODE(0x4C, ARG_BIT_1, ARG_REG_H, bit, 2, "BIT 1,H"),
-    OPCODE(0x4D, ARG_BIT_1, ARG_REG_L, bit, 2, "BIT 1,L"),
-    OPCODE(0x4E, ARG_BIT_1, ARG_IND_HL, bit, 3, "BIT 1,(HL)"),
-    OPCODE(0x4F, ARG_BIT_1, ARG_REG_A, bit, 2, "BIT 1,A"),
-    OPCODE(0x50, ARG_BIT_2, ARG_REG_B, bit, 2, "BIT 2,B"),
-    OPCODE(0x51, ARG_BIT_2, ARG_REG_C, bit, 2, "BIT 2,C"),
-    OPCODE(0x52, ARG_BIT_2, ARG_REG_D, bit, 2, "BIT 2,D"),
-    OPCODE(0x53, ARG_BIT_2, ARG_REG_E, bit, 2, "BIT 2,E"),
-    OPCODE(0x54, ARG_BIT_2, ARG_REG_H, bit, 2, "BIT 2,H"),
-    OPCODE(0x55, ARG_BIT_2, ARG_REG_L, bit, 2, "BIT 2,L"),
-    OPCODE(0x56, ARG_BIT_2, ARG_IND_HL, bit, 3, "BIT 2,(HL)"),
-    OPCODE(0x57, ARG_BIT_2, ARG_REG_A, bit, 2, "BIT 2,A"),
-    OPCODE(0x58, ARG_BIT_3, ARG_REG_B, bit, 2, "BIT 3,B"),
-    OPCODE(0x59, ARG_BIT_3, ARG_REG_C, bit, 2, "BIT 3,C"),
-    OPCODE(0x5A, ARG_BIT_3, ARG_REG_D, bit, 2, "BIT 3,D"),
-    OPCODE(0x5B, ARG_BIT_3, ARG_REG_E, bit, 2, "BIT 3,E"),
-    OPCODE(0x5C, ARG_BIT_3, ARG_REG_H, bit, 2, "BIT 3,H"),
-    OPCODE(0x5D, ARG_BIT_3, ARG_REG_L, bit, 2, "BIT 3,L"),
-    OPCODE(0x5E, ARG_BIT_3, ARG_IND_HL, bit, 3, "BIT 3,(HL)"),
-    OPCODE(0x5F, ARG_BIT_3, ARG_REG_A, bit, 2, "BIT 3,A"),
-    OPCODE(0x60, ARG_BIT_4, ARG_REG_B, bit, 2, "BIT 4,B"),
-    OPCODE(0x61, ARG_BIT_4, ARG_REG_C, bit, 2, "BIT 4,C"),
-    OPCODE(0x62, ARG_BIT_4, ARG_REG_D, bit, 2, "BIT 4,D"),
-    OPCODE(0x63, ARG_BIT_4, ARG_REG_E, bit, 2, "BIT 4,E"),
-    OPCODE(0x64, ARG_BIT_4, ARG_REG_H, bit, 2, "BIT 4,H"),
-    OPCODE(0x65, ARG_BIT_4, ARG_REG_L, bit, 2, "BIT 4,L"),
-    OPCODE(0x66, ARG_BIT_4, ARG_IND_HL, bit, 3, "BIT 4,(HL)"),
-    OPCODE(0x67, ARG_BIT_4, ARG_REG_A, bit, 2, "BIT 4,A"),
-    OPCODE(0x68, ARG_BIT_5, ARG_REG_B, bit, 2, "BIT 5,B"),
-    OPCODE(0x69, ARG_BIT_5, ARG_REG_C, bit, 2, "BIT 5,C"),
-    OPCODE(0x6A, ARG_BIT_5, ARG_REG_D, bit, 2, "BIT 5,D"),
-    OPCODE(0x6B, ARG_BIT_5, ARG_REG_E, bit, 2, "BIT 5,E"),
-    OPCODE(0x6C, ARG_BIT_5, ARG_REG_H, bit, 2, "BIT 5,H"),
-    OPCODE(0x6D, ARG_BIT_5, ARG_REG_L, bit, 2, "BIT 5,L"),
-    OPCODE(0x6E, ARG_BIT_5, ARG_IND_HL, bit, 3, "BIT 5,(HL)"),
-    OPCODE(0x6F, ARG_BIT_5, ARG_REG_A, bit, 2, "BIT 5,A"),
-    OPCODE(0x70, ARG_BIT_6, ARG_REG_B, bit, 2, "BIT 6,B"),
-    OPCODE(0x71, ARG_BIT_6, ARG_REG_C, bit, 2, "BIT 6,C"),
-    OPCODE(0x72, ARG_BIT_6, ARG_REG_D, bit, 2, "BIT 6,D"),
-    OPCODE(0x73, ARG_BIT_6, ARG_REG_E, bit, 2, "BIT 6,E"),
-    OPCODE(0x74, ARG_BIT_6, ARG_REG_H, bit, 2, "BIT 6,H"),
-    OPCODE(0x75, ARG_BIT_6, ARG_REG_L, bit, 2, "BIT 6,L"),
-    OPCODE(0x76, ARG_BIT_6, ARG_IND_HL, bit, 3, "BIT 6,(HL)"),
-    OPCODE(0x77, ARG_BIT_6, ARG_REG_A, bit, 2, "BIT 6,A"),
-    OPCODE(0x78, ARG_BIT_7, ARG_REG_B, bit, 2, "BIT 7,B"),
-    OPCODE(0x79, ARG_BIT_7, ARG_REG_C, bit, 2, "BIT 7,C"),
-    OPCODE(0x7A, ARG_BIT_7, ARG_REG_D, bit, 2, "BIT 7,D"),
-    OPCODE(0x7B, ARG_BIT_7, ARG_REG_E, bit, 2, "BIT 7,E"),
-    OPCODE(0x7C, ARG_BIT_7, ARG_REG_H, bit, 2, "BIT 7,H"),
-    OPCODE(0x7D, ARG_BIT_7, ARG_REG_L, bit, 2, "BIT 7,L"),
-    OPCODE(0x7E, ARG_BIT_7, ARG_IND_HL, bit, 3, "BIT 7,(HL)"),
-    OPCODE(0x7F, ARG_BIT_7, ARG_REG_A, bit, 2, "BIT 7,A"),
+    OPCODE(0x40, BIT_0, REG_B, bit, 2, "BIT 0,B"),
+    OPCODE(0x41, BIT_0, REG_C, bit, 2, "BIT 0,C"),
+    OPCODE(0x42, BIT_0, REG_D, bit, 2, "BIT 0,D"),
+    OPCODE(0x43, BIT_0, REG_E, bit, 2, "BIT 0,E"),
+    OPCODE(0x44, BIT_0, REG_H, bit, 2, "BIT 0,H"),
+    OPCODE(0x45, BIT_0, REG_L, bit, 2, "BIT 0,L"),
+    OPCODE(0x46, BIT_0, IND_HL, bit, 3, "BIT 0,(HL)"),
+    OPCODE(0x47, BIT_0, REG_A, bit, 2, "BIT 0,A"),
+    OPCODE(0x48, BIT_1, REG_B, bit, 2, "BIT 1,B"),
+    OPCODE(0x49, BIT_1, REG_C, bit, 2, "BIT 1,C"),
+    OPCODE(0x4A, BIT_1, REG_D, bit, 2, "BIT 1,D"),
+    OPCODE(0x4B, BIT_1, REG_E, bit, 2, "BIT 1,E"),
+    OPCODE(0x4C, BIT_1, REG_H, bit, 2, "BIT 1,H"),
+    OPCODE(0x4D, BIT_1, REG_L, bit, 2, "BIT 1,L"),
+    OPCODE(0x4E, BIT_1, IND_HL, bit, 3, "BIT 1,(HL)"),
+    OPCODE(0x4F, BIT_1, REG_A, bit, 2, "BIT 1,A"),
+    OPCODE(0x50, BIT_2, REG_B, bit, 2, "BIT 2,B"),
+    OPCODE(0x51, BIT_2, REG_C, bit, 2, "BIT 2,C"),
+    OPCODE(0x52, BIT_2, REG_D, bit, 2, "BIT 2,D"),
+    OPCODE(0x53, BIT_2, REG_E, bit, 2, "BIT 2,E"),
+    OPCODE(0x54, BIT_2, REG_H, bit, 2, "BIT 2,H"),
+    OPCODE(0x55, BIT_2, REG_L, bit, 2, "BIT 2,L"),
+    OPCODE(0x56, BIT_2, IND_HL, bit, 3, "BIT 2,(HL)"),
+    OPCODE(0x57, BIT_2, REG_A, bit, 2, "BIT 2,A"),
+    OPCODE(0x58, BIT_3, REG_B, bit, 2, "BIT 3,B"),
+    OPCODE(0x59, BIT_3, REG_C, bit, 2, "BIT 3,C"),
+    OPCODE(0x5A, BIT_3, REG_D, bit, 2, "BIT 3,D"),
+    OPCODE(0x5B, BIT_3, REG_E, bit, 2, "BIT 3,E"),
+    OPCODE(0x5C, BIT_3, REG_H, bit, 2, "BIT 3,H"),
+    OPCODE(0x5D, BIT_3, REG_L, bit, 2, "BIT 3,L"),
+    OPCODE(0x5E, BIT_3, IND_HL, bit, 3, "BIT 3,(HL)"),
+    OPCODE(0x5F, BIT_3, REG_A, bit, 2, "BIT 3,A"),
+    OPCODE(0x60, BIT_4, REG_B, bit, 2, "BIT 4,B"),
+    OPCODE(0x61, BIT_4, REG_C, bit, 2, "BIT 4,C"),
+    OPCODE(0x62, BIT_4, REG_D, bit, 2, "BIT 4,D"),
+    OPCODE(0x63, BIT_4, REG_E, bit, 2, "BIT 4,E"),
+    OPCODE(0x64, BIT_4, REG_H, bit, 2, "BIT 4,H"),
+    OPCODE(0x65, BIT_4, REG_L, bit, 2, "BIT 4,L"),
+    OPCODE(0x66, BIT_4, IND_HL, bit, 3, "BIT 4,(HL)"),
+    OPCODE(0x67, BIT_4, REG_A, bit, 2, "BIT 4,A"),
+    OPCODE(0x68, BIT_5, REG_B, bit, 2, "BIT 5,B"),
+    OPCODE(0x69, BIT_5, REG_C, bit, 2, "BIT 5,C"),
+    OPCODE(0x6A, BIT_5, REG_D, bit, 2, "BIT 5,D"),
+    OPCODE(0x6B, BIT_5, REG_E, bit, 2, "BIT 5,E"),
+    OPCODE(0x6C, BIT_5, REG_H, bit, 2, "BIT 5,H"),
+    OPCODE(0x6D, BIT_5, REG_L, bit, 2, "BIT 5,L"),
+    OPCODE(0x6E, BIT_5, IND_HL, bit, 3, "BIT 5,(HL)"),
+    OPCODE(0x6F, BIT_5, REG_A, bit, 2, "BIT 5,A"),
+    OPCODE(0x70, BIT_6, REG_B, bit, 2, "BIT 6,B"),
+    OPCODE(0x71, BIT_6, REG_C, bit, 2, "BIT 6,C"),
+    OPCODE(0x72, BIT_6, REG_D, bit, 2, "BIT 6,D"),
+    OPCODE(0x73, BIT_6, REG_E, bit, 2, "BIT 6,E"),
+    OPCODE(0x74, BIT_6, REG_H, bit, 2, "BIT 6,H"),
+    OPCODE(0x75, BIT_6, REG_L, bit, 2, "BIT 6,L"),
+    OPCODE(0x76, BIT_6, IND_HL, bit, 3, "BIT 6,(HL)"),
+    OPCODE(0x77, BIT_6, REG_A, bit, 2, "BIT 6,A"),
+    OPCODE(0x78, BIT_7, REG_B, bit, 2, "BIT 7,B"),
+    OPCODE(0x79, BIT_7, REG_C, bit, 2, "BIT 7,C"),
+    OPCODE(0x7A, BIT_7, REG_D, bit, 2, "BIT 7,D"),
+    OPCODE(0x7B, BIT_7, REG_E, bit, 2, "BIT 7,E"),
+    OPCODE(0x7C, BIT_7, REG_H, bit, 2, "BIT 7,H"),
+    OPCODE(0x7D, BIT_7, REG_L, bit, 2, "BIT 7,L"),
+    OPCODE(0x7E, BIT_7, IND_HL, bit, 3, "BIT 7,(HL)"),
+    OPCODE(0x7F, BIT_7, REG_A, bit, 2, "BIT 7,A"),
 
-    OPCODE(0x80, ARG_BIT_0, ARG_REG_B, res, 2, "RES 0,B"),
-    OPCODE(0x81, ARG_BIT_0, ARG_REG_C, res, 2, "RES 0,C"),
-    OPCODE(0x82, ARG_BIT_0, ARG_REG_D, res, 2, "RES 0,D"),
-    OPCODE(0x83, ARG_BIT_0, ARG_REG_E, res, 2, "RES 0,E"),
-    OPCODE(0x84, ARG_BIT_0, ARG_REG_H, res, 2, "RES 0,H"),
-    OPCODE(0x85, ARG_BIT_0, ARG_REG_L, res, 2, "RES 0,L"),
-    OPCODE(0x86, ARG_BIT_0, ARG_IND_HL, res, 4, "RES 0,(HL)"),
-    OPCODE(0x87, ARG_BIT_0, ARG_REG_A, res, 2, "RES 0,A"),
-    OPCODE(0x88, ARG_BIT_1, ARG_REG_B, res, 2, "RES 1,B"),
-    OPCODE(0x89, ARG_BIT_1, ARG_REG_C, res, 2, "RES 1,C"),
-    OPCODE(0x8A, ARG_BIT_1, ARG_REG_D, res, 2, "RES 1,D"),
-    OPCODE(0x8B, ARG_BIT_1, ARG_REG_E, res, 2, "RES 1,E"),
-    OPCODE(0x8C, ARG_BIT_1, ARG_REG_H, res, 2, "RES 1,H"),
-    OPCODE(0x8D, ARG_BIT_1, ARG_REG_L, res, 2, "RES 1,L"),
-    OPCODE(0x8E, ARG_BIT_1, ARG_IND_HL, res, 4, "RES 1,(HL)"),
-    OPCODE(0x8F, ARG_BIT_1, ARG_REG_A, res, 2, "RES 1,A"),
-    OPCODE(0x90, ARG_BIT_2, ARG_REG_B, res, 2, "RES 2,B"),
-    OPCODE(0x91, ARG_BIT_2, ARG_REG_C, res, 2, "RES 2,C"),
-    OPCODE(0x92, ARG_BIT_2, ARG_REG_D, res, 2, "RES 2,D"),
-    OPCODE(0x93, ARG_BIT_2, ARG_REG_E, res, 2, "RES 2,E"),
-    OPCODE(0x94, ARG_BIT_2, ARG_REG_H, res, 2, "RES 2,H"),
-    OPCODE(0x95, ARG_BIT_2, ARG_REG_L, res, 2, "RES 2,L"),
-    OPCODE(0x96, ARG_BIT_2, ARG_IND_HL, res, 4, "RES 2,(HL)"),
-    OPCODE(0x97, ARG_BIT_2, ARG_REG_A, res, 2, "RES 2,A"),
-    OPCODE(0x98, ARG_BIT_3, ARG_REG_B, res, 2, "RES 3,B"),
-    OPCODE(0x99, ARG_BIT_3, ARG_REG_C, res, 2, "RES 3,C"),
-    OPCODE(0x9A, ARG_BIT_3, ARG_REG_D, res, 2, "RES 3,D"),
-    OPCODE(0x9B, ARG_BIT_3, ARG_REG_E, res, 2, "RES 3,E"),
-    OPCODE(0x9C, ARG_BIT_3, ARG_REG_H, res, 2, "RES 3,H"),
-    OPCODE(0x9D, ARG_BIT_3, ARG_REG_L, res, 2, "RES 3,L"),
-    OPCODE(0x9E, ARG_BIT_3, ARG_IND_HL, res, 4, "RES 3,(HL)"),
-    OPCODE(0x9F, ARG_BIT_3, ARG_REG_A, res, 2, "RES 3,A"),
-    OPCODE(0xA0, ARG_BIT_4, ARG_REG_B, res, 2, "RES 4,B"),
-    OPCODE(0xA1, ARG_BIT_4, ARG_REG_C, res, 2, "RES 4,C"),
-    OPCODE(0xA2, ARG_BIT_4, ARG_REG_D, res, 2, "RES 4,D"),
-    OPCODE(0xA3, ARG_BIT_4, ARG_REG_E, res, 2, "RES 4,E"),
-    OPCODE(0xA4, ARG_BIT_4, ARG_REG_H, res, 2, "RES 4,H"),
-    OPCODE(0xA5, ARG_BIT_4, ARG_REG_L, res, 2, "RES 4,L"),
-    OPCODE(0xA6, ARG_BIT_4, ARG_IND_HL, res, 4, "RES 4,(HL)"),
-    OPCODE(0xA7, ARG_BIT_4, ARG_REG_A, res, 2, "RES 4,A"),
-    OPCODE(0xA8, ARG_BIT_5, ARG_REG_B, res, 2, "RES 5,B"),
-    OPCODE(0xA9, ARG_BIT_5, ARG_REG_C, res, 2, "RES 5,C"),
+    OPCODE(0x80, BIT_0, REG_B, res, 2, "RES 0,B"),
+    OPCODE(0x81, BIT_0, REG_C, res, 2, "RES 0,C"),
+    OPCODE(0x82, BIT_0, REG_D, res, 2, "RES 0,D"),
+    OPCODE(0x83, BIT_0, REG_E, res, 2, "RES 0,E"),
+    OPCODE(0x84, BIT_0, REG_H, res, 2, "RES 0,H"),
+    OPCODE(0x85, BIT_0, REG_L, res, 2, "RES 0,L"),
+    OPCODE(0x86, BIT_0, IND_HL, res, 4, "RES 0,(HL)"),
+    OPCODE(0x87, BIT_0, REG_A, res, 2, "RES 0,A"),
+    OPCODE(0x88, BIT_1, REG_B, res, 2, "RES 1,B"),
+    OPCODE(0x89, BIT_1, REG_C, res, 2, "RES 1,C"),
+    OPCODE(0x8A, BIT_1, REG_D, res, 2, "RES 1,D"),
+    OPCODE(0x8B, BIT_1, REG_E, res, 2, "RES 1,E"),
+    OPCODE(0x8C, BIT_1, REG_H, res, 2, "RES 1,H"),
+    OPCODE(0x8D, BIT_1, REG_L, res, 2, "RES 1,L"),
+    OPCODE(0x8E, BIT_1, IND_HL, res, 4, "RES 1,(HL)"),
+    OPCODE(0x8F, BIT_1, REG_A, res, 2, "RES 1,A"),
+    OPCODE(0x90, BIT_2, REG_B, res, 2, "RES 2,B"),
+    OPCODE(0x91, BIT_2, REG_C, res, 2, "RES 2,C"),
+    OPCODE(0x92, BIT_2, REG_D, res, 2, "RES 2,D"),
+    OPCODE(0x93, BIT_2, REG_E, res, 2, "RES 2,E"),
+    OPCODE(0x94, BIT_2, REG_H, res, 2, "RES 2,H"),
+    OPCODE(0x95, BIT_2, REG_L, res, 2, "RES 2,L"),
+    OPCODE(0x96, BIT_2, IND_HL, res, 4, "RES 2,(HL)"),
+    OPCODE(0x97, BIT_2, REG_A, res, 2, "RES 2,A"),
+    OPCODE(0x98, BIT_3, REG_B, res, 2, "RES 3,B"),
+    OPCODE(0x99, BIT_3, REG_C, res, 2, "RES 3,C"),
+    OPCODE(0x9A, BIT_3, REG_D, res, 2, "RES 3,D"),
+    OPCODE(0x9B, BIT_3, REG_E, res, 2, "RES 3,E"),
+    OPCODE(0x9C, BIT_3, REG_H, res, 2, "RES 3,H"),
+    OPCODE(0x9D, BIT_3, REG_L, res, 2, "RES 3,L"),
+    OPCODE(0x9E, BIT_3, IND_HL, res, 4, "RES 3,(HL)"),
+    OPCODE(0x9F, BIT_3, REG_A, res, 2, "RES 3,A"),
+    OPCODE(0xA0, BIT_4, REG_B, res, 2, "RES 4,B"),
+    OPCODE(0xA1, BIT_4, REG_C, res, 2, "RES 4,C"),
+    OPCODE(0xA2, BIT_4, REG_D, res, 2, "RES 4,D"),
+    OPCODE(0xA3, BIT_4, REG_E, res, 2, "RES 4,E"),
+    OPCODE(0xA4, BIT_4, REG_H, res, 2, "RES 4,H"),
+    OPCODE(0xA5, BIT_4, REG_L, res, 2, "RES 4,L"),
+    OPCODE(0xA6, BIT_4, IND_HL, res, 4, "RES 4,(HL)"),
+    OPCODE(0xA7, BIT_4, REG_A, res, 2, "RES 4,A"),
+    OPCODE(0xA8, BIT_5, REG_B, res, 2, "RES 5,B"),
+    OPCODE(0xA9, BIT_5, REG_C, res, 2, "RES 5,C"),
 
-    OPCODE(0xAA, ARG_BIT_5, ARG_REG_D, res, 2, "RES 5,D"),
-    OPCODE(0xAB, ARG_BIT_5, ARG_REG_E, res, 2, "RES 5,E"),
-    OPCODE(0xAC, ARG_BIT_5, ARG_REG_H, res, 2, "RES 5,H"),
-    OPCODE(0xAD, ARG_BIT_5, ARG_REG_L, res, 2, "RES 5,L"),
-    OPCODE(0xAE, ARG_BIT_5, ARG_IND_HL, res, 4, "RES 5,(HL)"),
-    OPCODE(0xAF, ARG_BIT_5, ARG_REG_A, res, 2, "RES 5,A"),
-    OPCODE(0xB0, ARG_BIT_6, ARG_REG_B, res, 2, "RES 6,B"),
-    OPCODE(0xB1, ARG_BIT_6, ARG_REG_C, res, 2, "RES 6,C"),
-    OPCODE(0xB2, ARG_BIT_6, ARG_REG_D, res, 2, "RES 6,D"),
-    OPCODE(0xB3, ARG_BIT_6, ARG_REG_E, res, 2, "RES 6,E"),
-    OPCODE(0xB4, ARG_BIT_6, ARG_REG_H, res, 2, "RES 6,H"),
-    OPCODE(0xB5, ARG_BIT_6, ARG_REG_L, res, 2, "RES 6,L"),
-    OPCODE(0xB6, ARG_BIT_6, ARG_IND_HL, res, 4, "RES 6,(HL)"),
-    OPCODE(0xB7, ARG_BIT_6, ARG_REG_A, res, 2, "RES 6,A"),
-    OPCODE(0xB8, ARG_BIT_7, ARG_REG_B, res, 2, "RES 7,B"),
-    OPCODE(0xB9, ARG_BIT_7, ARG_REG_C, res, 2, "RES 7,C"),
-    OPCODE(0xBA, ARG_BIT_7, ARG_REG_D, res, 2, "RES 7,D"),
-    OPCODE(0xBB, ARG_BIT_7, ARG_REG_E, res, 2, "RES 7,E"),
-    OPCODE(0xBC, ARG_BIT_7, ARG_REG_H, res, 2, "RES 7,H"),
-    OPCODE(0xBD, ARG_BIT_7, ARG_REG_L, res, 2, "RES 7,L"),
-    OPCODE(0xBE, ARG_BIT_7, ARG_IND_HL, res, 4, "RES 7,(HL)"),
-    OPCODE(0xBF, ARG_BIT_7, ARG_REG_A, res, 2, "RES 7,A"),
+    OPCODE(0xAA, BIT_5, REG_D, res, 2, "RES 5,D"),
+    OPCODE(0xAB, BIT_5, REG_E, res, 2, "RES 5,E"),
+    OPCODE(0xAC, BIT_5, REG_H, res, 2, "RES 5,H"),
+    OPCODE(0xAD, BIT_5, REG_L, res, 2, "RES 5,L"),
+    OPCODE(0xAE, BIT_5, IND_HL, res, 4, "RES 5,(HL)"),
+    OPCODE(0xAF, BIT_5, REG_A, res, 2, "RES 5,A"),
+    OPCODE(0xB0, BIT_6, REG_B, res, 2, "RES 6,B"),
+    OPCODE(0xB1, BIT_6, REG_C, res, 2, "RES 6,C"),
+    OPCODE(0xB2, BIT_6, REG_D, res, 2, "RES 6,D"),
+    OPCODE(0xB3, BIT_6, REG_E, res, 2, "RES 6,E"),
+    OPCODE(0xB4, BIT_6, REG_H, res, 2, "RES 6,H"),
+    OPCODE(0xB5, BIT_6, REG_L, res, 2, "RES 6,L"),
+    OPCODE(0xB6, BIT_6, IND_HL, res, 4, "RES 6,(HL)"),
+    OPCODE(0xB7, BIT_6, REG_A, res, 2, "RES 6,A"),
+    OPCODE(0xB8, BIT_7, REG_B, res, 2, "RES 7,B"),
+    OPCODE(0xB9, BIT_7, REG_C, res, 2, "RES 7,C"),
+    OPCODE(0xBA, BIT_7, REG_D, res, 2, "RES 7,D"),
+    OPCODE(0xBB, BIT_7, REG_E, res, 2, "RES 7,E"),
+    OPCODE(0xBC, BIT_7, REG_H, res, 2, "RES 7,H"),
+    OPCODE(0xBD, BIT_7, REG_L, res, 2, "RES 7,L"),
+    OPCODE(0xBE, BIT_7, IND_HL, res, 4, "RES 7,(HL)"),
+    OPCODE(0xBF, BIT_7, REG_A, res, 2, "RES 7,A"),
 
-    OPCODE(0xC0, ARG_BIT_0, ARG_REG_B, set, 2, "SET 0,B"),
-    OPCODE(0xC1, ARG_BIT_0, ARG_REG_C, set, 2, "SET 0,C"),
-    OPCODE(0xC2, ARG_BIT_0, ARG_REG_D, set, 2, "SET 0,D"),
-    OPCODE(0xC3, ARG_BIT_0, ARG_REG_E, set, 2, "SET 0,E"),
-    OPCODE(0xC4, ARG_BIT_0, ARG_REG_H, set, 2, "SET 0,H"),
-    OPCODE(0xC5, ARG_BIT_0, ARG_REG_L, set, 2, "SET 0,L"),
-    OPCODE(0xC6, ARG_BIT_0, ARG_IND_HL, set, 4, "SET 0,(HL)"),
-    OPCODE(0xC7, ARG_BIT_0, ARG_REG_A, set, 2, "SET 0,A"),
-    OPCODE(0xC8, ARG_BIT_1, ARG_REG_B, set, 2, "SET 1,B"),
-    OPCODE(0xC9, ARG_BIT_1, ARG_REG_C, set, 2, "SET 1,C"),
-    OPCODE(0xCA, ARG_BIT_1, ARG_REG_D, set, 2, "SET 1,D"),
-    OPCODE(0xCB, ARG_BIT_1, ARG_REG_E, set, 2, "SET 1,E"),
-    OPCODE(0xCC, ARG_BIT_1, ARG_REG_H, set, 2, "SET 1,H"),
-    OPCODE(0xCD, ARG_BIT_1, ARG_REG_L, set, 2, "SET 1,L"),
-    OPCODE(0xCE, ARG_BIT_1, ARG_IND_HL, set, 4, "SET 1,(HL)"),
-    OPCODE(0xCF, ARG_BIT_1, ARG_REG_A, set, 2, "SET 1,A"),
-    OPCODE(0xD0, ARG_BIT_2, ARG_REG_B, set, 2, "SET 2,B"),
-    OPCODE(0xD1, ARG_BIT_2, ARG_REG_C, set, 2, "SET 2,C"),
-    OPCODE(0xD2, ARG_BIT_2, ARG_REG_D, set, 2, "SET 2,D"),
-    OPCODE(0xD3, ARG_BIT_2, ARG_REG_E, set, 2, "SET 2,E"),
-    OPCODE(0xD4, ARG_BIT_2, ARG_REG_H, set, 2, "SET 2,H"),
-    OPCODE(0xD5, ARG_BIT_2, ARG_REG_L, set, 2, "SET 2,L"),
-    OPCODE(0xD6, ARG_BIT_2, ARG_IND_HL, set, 4, "SET 2,(HL)"),
-    OPCODE(0xD7, ARG_BIT_2, ARG_REG_A, set, 2, "SET 2,A"),
-    OPCODE(0xD8, ARG_BIT_3, ARG_REG_B, set, 2, "SET 3,B"),
-    OPCODE(0xD9, ARG_BIT_3, ARG_REG_C, set, 2, "SET 3,C"),
-    OPCODE(0xDA, ARG_BIT_3, ARG_REG_D, set, 2, "SET 3,D"),
-    OPCODE(0xDB, ARG_BIT_3, ARG_REG_E, set, 2, "SET 3,E"),
-    OPCODE(0xDC, ARG_BIT_3, ARG_REG_H, set, 2, "SET 3,H"),
-    OPCODE(0xDD, ARG_BIT_3, ARG_REG_L, set, 2, "SET 3,L"),
-    OPCODE(0xDE, ARG_BIT_3, ARG_IND_HL, set, 4, "SET 3,(HL)"),
-    OPCODE(0xDF, ARG_BIT_3, ARG_REG_A, set, 2, "SET 3,A"),
-    OPCODE(0xE0, ARG_BIT_4, ARG_REG_B, set, 2, "SET 4,B"),
-    OPCODE(0xE1, ARG_BIT_4, ARG_REG_C, set, 2, "SET 4,C"),
-    OPCODE(0xE2, ARG_BIT_4, ARG_REG_D, set, 2, "SET 4,D"),
-    OPCODE(0xE3, ARG_BIT_4, ARG_REG_E, set, 2, "SET 4,E"),
-    OPCODE(0xE4, ARG_BIT_4, ARG_REG_H, set, 2, "SET 4,H"),
-    OPCODE(0xE5, ARG_BIT_4, ARG_REG_L, set, 2, "SET 4,L"),
-    OPCODE(0xE6, ARG_BIT_4, ARG_IND_HL, set, 4, "SET 4,(HL)"),
-    OPCODE(0xE7, ARG_BIT_4, ARG_REG_A, set, 2, "SET 4,A"),
-    OPCODE(0xE8, ARG_BIT_5, ARG_REG_B, set, 2, "SET 5,B"),
-    OPCODE(0xE9, ARG_BIT_5, ARG_REG_C, set, 2, "SET 5,C"),
-    OPCODE(0xEA, ARG_BIT_5, ARG_REG_D, set, 2, "SET 5,D"),
-    OPCODE(0xEB, ARG_BIT_5, ARG_REG_E, set, 2, "SET 5,E"),
-    OPCODE(0xEC, ARG_BIT_5, ARG_REG_H, set, 2, "SET 5,H"),
-    OPCODE(0xED, ARG_BIT_5, ARG_REG_L, set, 2, "SET 5,L"),
-    OPCODE(0xEE, ARG_BIT_5, ARG_IND_HL, set, 4, "SET 5,(HL)"),
-    OPCODE(0xEF, ARG_BIT_5, ARG_REG_A, set, 2, "SET 5,A"),
-    OPCODE(0xF0, ARG_BIT_6, ARG_REG_B, set, 2, "SET 6,B"),
-    OPCODE(0xF1, ARG_BIT_6, ARG_REG_C, set, 2, "SET 6,C"),
-    OPCODE(0xF2, ARG_BIT_6, ARG_REG_D, set, 2, "SET 6,D"),
-    OPCODE(0xF3, ARG_BIT_6, ARG_REG_E, set, 2, "SET 6,E"),
-    OPCODE(0xF4, ARG_BIT_6, ARG_REG_H, set, 2, "SET 6,H"),
-    OPCODE(0xF5, ARG_BIT_6, ARG_REG_L, set, 2, "SET 6,L"),
-    OPCODE(0xF6, ARG_BIT_6, ARG_IND_HL, set, 4, "SET 6,(HL)"),
-    OPCODE(0xF7, ARG_BIT_6, ARG_REG_A, set, 2, "SET 6,A"),
-    OPCODE(0xF8, ARG_BIT_7, ARG_REG_B, set, 2, "SET 7,B"),
-    OPCODE(0xF9, ARG_BIT_7, ARG_REG_C, set, 2, "SET 7,C"),
-    OPCODE(0xFA, ARG_BIT_7, ARG_REG_D, set, 2, "SET 7,D"),
-    OPCODE(0xFB, ARG_BIT_7, ARG_REG_E, set, 2, "SET 7,E"),
-    OPCODE(0xFC, ARG_BIT_7, ARG_REG_H, set, 2, "SET 7,H"),
-    OPCODE(0xFD, ARG_BIT_7, ARG_REG_L, set, 2, "SET 7,L"),
-    OPCODE(0xFE, ARG_BIT_7, ARG_IND_HL, set, 4, "SET 7,(HL)"),
-    OPCODE(0xFF, ARG_BIT_7, ARG_REG_A, set, 2, "SET 7,A"),
+    OPCODE(0xC0, BIT_0, REG_B, set, 2, "SET 0,B"),
+    OPCODE(0xC1, BIT_0, REG_C, set, 2, "SET 0,C"),
+    OPCODE(0xC2, BIT_0, REG_D, set, 2, "SET 0,D"),
+    OPCODE(0xC3, BIT_0, REG_E, set, 2, "SET 0,E"),
+    OPCODE(0xC4, BIT_0, REG_H, set, 2, "SET 0,H"),
+    OPCODE(0xC5, BIT_0, REG_L, set, 2, "SET 0,L"),
+    OPCODE(0xC6, BIT_0, IND_HL, set, 4, "SET 0,(HL)"),
+    OPCODE(0xC7, BIT_0, REG_A, set, 2, "SET 0,A"),
+    OPCODE(0xC8, BIT_1, REG_B, set, 2, "SET 1,B"),
+    OPCODE(0xC9, BIT_1, REG_C, set, 2, "SET 1,C"),
+    OPCODE(0xCA, BIT_1, REG_D, set, 2, "SET 1,D"),
+    OPCODE(0xCB, BIT_1, REG_E, set, 2, "SET 1,E"),
+    OPCODE(0xCC, BIT_1, REG_H, set, 2, "SET 1,H"),
+    OPCODE(0xCD, BIT_1, REG_L, set, 2, "SET 1,L"),
+    OPCODE(0xCE, BIT_1, IND_HL, set, 4, "SET 1,(HL)"),
+    OPCODE(0xCF, BIT_1, REG_A, set, 2, "SET 1,A"),
+    OPCODE(0xD0, BIT_2, REG_B, set, 2, "SET 2,B"),
+    OPCODE(0xD1, BIT_2, REG_C, set, 2, "SET 2,C"),
+    OPCODE(0xD2, BIT_2, REG_D, set, 2, "SET 2,D"),
+    OPCODE(0xD3, BIT_2, REG_E, set, 2, "SET 2,E"),
+    OPCODE(0xD4, BIT_2, REG_H, set, 2, "SET 2,H"),
+    OPCODE(0xD5, BIT_2, REG_L, set, 2, "SET 2,L"),
+    OPCODE(0xD6, BIT_2, IND_HL, set, 4, "SET 2,(HL)"),
+    OPCODE(0xD7, BIT_2, REG_A, set, 2, "SET 2,A"),
+    OPCODE(0xD8, BIT_3, REG_B, set, 2, "SET 3,B"),
+    OPCODE(0xD9, BIT_3, REG_C, set, 2, "SET 3,C"),
+    OPCODE(0xDA, BIT_3, REG_D, set, 2, "SET 3,D"),
+    OPCODE(0xDB, BIT_3, REG_E, set, 2, "SET 3,E"),
+    OPCODE(0xDC, BIT_3, REG_H, set, 2, "SET 3,H"),
+    OPCODE(0xDD, BIT_3, REG_L, set, 2, "SET 3,L"),
+    OPCODE(0xDE, BIT_3, IND_HL, set, 4, "SET 3,(HL)"),
+    OPCODE(0xDF, BIT_3, REG_A, set, 2, "SET 3,A"),
+    OPCODE(0xE0, BIT_4, REG_B, set, 2, "SET 4,B"),
+    OPCODE(0xE1, BIT_4, REG_C, set, 2, "SET 4,C"),
+    OPCODE(0xE2, BIT_4, REG_D, set, 2, "SET 4,D"),
+    OPCODE(0xE3, BIT_4, REG_E, set, 2, "SET 4,E"),
+    OPCODE(0xE4, BIT_4, REG_H, set, 2, "SET 4,H"),
+    OPCODE(0xE5, BIT_4, REG_L, set, 2, "SET 4,L"),
+    OPCODE(0xE6, BIT_4, IND_HL, set, 4, "SET 4,(HL)"),
+    OPCODE(0xE7, BIT_4, REG_A, set, 2, "SET 4,A"),
+    OPCODE(0xE8, BIT_5, REG_B, set, 2, "SET 5,B"),
+    OPCODE(0xE9, BIT_5, REG_C, set, 2, "SET 5,C"),
+    OPCODE(0xEA, BIT_5, REG_D, set, 2, "SET 5,D"),
+    OPCODE(0xEB, BIT_5, REG_E, set, 2, "SET 5,E"),
+    OPCODE(0xEC, BIT_5, REG_H, set, 2, "SET 5,H"),
+    OPCODE(0xED, BIT_5, REG_L, set, 2, "SET 5,L"),
+    OPCODE(0xEE, BIT_5, IND_HL, set, 4, "SET 5,(HL)"),
+    OPCODE(0xEF, BIT_5, REG_A, set, 2, "SET 5,A"),
+    OPCODE(0xF0, BIT_6, REG_B, set, 2, "SET 6,B"),
+    OPCODE(0xF1, BIT_6, REG_C, set, 2, "SET 6,C"),
+    OPCODE(0xF2, BIT_6, REG_D, set, 2, "SET 6,D"),
+    OPCODE(0xF3, BIT_6, REG_E, set, 2, "SET 6,E"),
+    OPCODE(0xF4, BIT_6, REG_H, set, 2, "SET 6,H"),
+    OPCODE(0xF5, BIT_6, REG_L, set, 2, "SET 6,L"),
+    OPCODE(0xF6, BIT_6, IND_HL, set, 4, "SET 6,(HL)"),
+    OPCODE(0xF7, BIT_6, REG_A, set, 2, "SET 6,A"),
+    OPCODE(0xF8, BIT_7, REG_B, set, 2, "SET 7,B"),
+    OPCODE(0xF9, BIT_7, REG_C, set, 2, "SET 7,C"),
+    OPCODE(0xFA, BIT_7, REG_D, set, 2, "SET 7,D"),
+    OPCODE(0xFB, BIT_7, REG_E, set, 2, "SET 7,E"),
+    OPCODE(0xFC, BIT_7, REG_H, set, 2, "SET 7,H"),
+    OPCODE(0xFD, BIT_7, REG_L, set, 2, "SET 7,L"),
+    OPCODE(0xFE, BIT_7, IND_HL, set, 4, "SET 7,(HL)"),
+    OPCODE(0xFF, BIT_7, REG_A, set, 2, "SET 7,A"),
 };

@@ -11,7 +11,7 @@ const MapperVT mbc0_vtable = {
     .write = mbc0_write,
     .read = mbc0_read,
     .reset = mbc0_reset,
-    .free = mbc0_free,
+    .deinit = mbc0_deinit,
 };
 
 static inline MBC0 *
@@ -30,7 +30,7 @@ mbc0_init(Mapper *mapper, ROM *rom)
 }
 
 void
-mbc0_free(Mapper *mapper)
+mbc0_deinit(Mapper *mapper)
 {
     UNUSED(mapper);
 }

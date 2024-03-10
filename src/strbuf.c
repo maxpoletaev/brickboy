@@ -14,11 +14,21 @@ strbuf_check(Strbuf *buf, size_t newpos)
     }
 }
 
-void
-strbuf_init(Strbuf *buf, char *data, size_t size)
+Strbuf
+strbuf_new(size_t size)
 {
-    buf->data = data;
-    buf->cap = size;
+    return (Strbuf) {
+        .str = xalloc(size),
+        .cap = size,
+        .pos = 0,
+    };
+}
+
+void
+strbuf_free(Strbuf *buf)
+{
+    xfree(buf->str);
+    buf->cap = 0;
     buf->pos = 0;
 }
 
@@ -27,8 +37,8 @@ strbuf_pad(Strbuf *buf, size_t len, char pad)
 {
     if (buf->pos < len) {
         strbuf_check(buf, len);
-        memset(buf->data + buf->pos, pad, len - buf->pos);
-        buf->data[len + 1] = '\0';
+        memset(buf->str + buf->pos, pad, len - buf->pos);
+        buf->str[len + 1] = '\0';
         buf->pos = len;
     }
 }
@@ -40,16 +50,16 @@ strbuf_add(Strbuf *buf, const char *str)
     size_t newpos = buf->pos + len;
 
     strbuf_check(buf, newpos);
-    memcpy(buf->data + buf->pos, str, len + 1);
+    memcpy(buf->str + buf->pos, str, len + 1);
 
     buf->pos = newpos;
 }
 
-void
+void __attribute__((format(printf, 2, 3)))
 strbuf_addf(Strbuf *buf, const char *fmt, ...)
 {
     int len = 0;
-    char *ptr = buf->data + buf->pos;
+    char *ptr = buf->str + buf->pos;
     size_t left = buf->cap - buf->pos;
 
     va_list args;
@@ -65,4 +75,11 @@ strbuf_addf(Strbuf *buf, const char *fmt, ...)
     strbuf_check(buf, newpos);
 
     buf->pos = newpos;
+}
+
+void
+strbuf_clear(Strbuf *buf)
+{
+    buf->pos = 0;
+    buf->str[0] = '\0';
 }

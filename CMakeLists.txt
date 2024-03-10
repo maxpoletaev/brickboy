@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 project(brickboy
         VERSION 1.0
@@ -8,33 +8,23 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_EXTENSIONS ON)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_CLANG_TIDY "clang-tidy")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BUILD_TYPE Debug)
 
-execute_process(
-        COMMAND date "+%Y.%m.%d"
-        OUTPUT_VARIABLE BUILD_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-execute_process(
-        COMMAND git rev-parse --short HEAD
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE BUILD_COMMIT_HASH
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+find_package(raylib 4.2 REQUIRED)
 
 add_compile_options(
-        -Wall -Wextra -Wpedantic -Wconversion -Werror
-        -Wno-gnu-zero-variadic-macro-arguments
-        -Wno-sign-conversion
-        -Wno-gnu-case-range)
+    -Wall -Wextra -Wpedantic
+    -Wno-gnu-zero-variadic-macro-arguments
+    -Wno-gnu-case-range)
 
-#configure_file(config.h.in "${CMAKE_SOURCE_DIR}/src/config.h")
-#add_custom_target(config DEPENDS src/config.h)
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_link_options(-fsanitize=address)
+    add_compile_options(-fsanitize=address)
+endif()
 
 file(GLOB sources src/*.c src/*.h)
+
+# brickboy
 add_executable(brickboy ${sources})
-#add_dependencies(brickboy config)
-
-add_link_options(-fsanitize=address)
-add_compile_options(-fsanitize=address)
-add_executable(brickboy-asan ${sources})
-
+target_link_libraries(brickboy PRIVATE raylib)

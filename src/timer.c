@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "common.h"
 #include "timer.h"
@@ -7,7 +7,8 @@
 static const int timer_freqs[] = {1024, 16, 64, 256};
 
 void
-timer_reset(Timer *t) {
+timer_reset(Timer *t)
+{
     t->divider = 0;
     t->counter = 0;
     t->reload = 0;
@@ -18,7 +19,8 @@ timer_reset(Timer *t) {
 }
 
 uint8_t
-timer_read(Timer *t, uint16_t addr) {
+timer_read(Timer *t, uint16_t addr)
+{
     switch (addr) {
     case 0xFF04:
         return t->divider;
@@ -34,9 +36,8 @@ timer_read(Timer *t, uint16_t addr) {
 }
 
 void
-timer_write(Timer *t, uint16_t addr, uint8_t val) {
-    LOG("timer write: 0x%04X=0x%02X", addr, val);
-
+timer_write(Timer *t, uint16_t addr, uint8_t val)
+{
     switch (addr) {
     case 0xFF04:
         t->divider = 0;
@@ -56,21 +57,22 @@ timer_write(Timer *t, uint16_t addr, uint8_t val) {
 }
 
 void
-timer_step_fast(Timer *t, int cycles) {
+timer_step(Timer *t)
+{
     bool enabled = (t->ctrl & (1 << 2)) != 0;
 
-    t->internal_divider += cycles;
-    if (t->internal_divider >= 256) {
-        t->internal_divider -= 256;
+    t->internal_divider++;
+    if (t->internal_divider == 256) {
+        t->internal_divider = 0;
         t->divider++;
     }
 
     if (enabled) {
         int freq = timer_freqs[t->ctrl & 0x03];
-        t->internal_counter += cycles;
+        t->internal_counter++;
 
-        while (t->internal_counter > freq) {
-            t->internal_counter -= freq;
+        if (t->internal_counter == freq) {
+            t->internal_counter = 0;
             t->counter++;
 
             if (t->counter == 0xFF) {

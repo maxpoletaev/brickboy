@@ -6,36 +6,28 @@
 #include "timer.h"
 #include "mmu.h"
 #include "serial.h"
+#include "ppu.h"
 
 void
 mmu_reset(MMU *mmu)
 {
+    ppu_reset(&mmu->ppu);
     timer_reset(&mmu->timer);
     serial_reset(&mmu->serial);
     mapper_reset(mmu->mapper);
 
     memset(mmu->ram, 0x00, sizeof(mmu->ram));
-    memset(mmu->vram, 0x00, sizeof(mmu->vram));
-    memset(mmu->oam, 0x00, sizeof(mmu->oam));
     memset(mmu->hram, 0xFF, sizeof(mmu->hram));
-    memset(mmu->io, 0, sizeof(mmu->io));
 
-    mmu->inte = 0;
-    mmu->intf = 0;
+    mmu->IE = 0;
+    mmu->IF = 0;
 }
 
 uint8_t
 mmu_read(MMU *mmu, uint16_t addr)
 {
-    if (addr == 0xFF44) {
-        return 0x90; // LY=144, hardcoded for now to pass blargg's tests
-    }
-
     switch (addr) {
     case 0x0000 ... 0x7FFF: // ROM
-        return mapper_read(mmu->mapper, addr);
-    case 0x8000 ... 0x9FFF: // VRAM
-        return mmu->vram[addr - 0x8000];
     case 0xA000 ... 0xBFFF: // External RAM
         return mapper_read(mmu->mapper, addr);
     case 0xC000 ... 0xDFFF: // Internal RAM
@@ -47,13 +39,19 @@ mmu_read(MMU *mmu, uint16_t addr)
     case 0xFF04 ... 0xFF07: // Timer
         return timer_read(&mmu->timer, addr);
     case 0xFF0F: // Interrupt Flags
-        LOG("intf read: 0x%02X", mmu->intf);
-        return mmu->intf;
+        return mmu->IF;
+    case 0xFF10 ... 0xFF3F: // Sound
+        return 0;
+    case 0xFF40 ... 0xFF4B: // PPU registers
+    case 0x8000 ... 0x9FFF: // VRAM
+    case 0xFE00 ... 0xFE9F: // OAM
+        return ppu_read(&mmu->ppu, addr);
+    case 0xFEA0 ... 0xFEFF: // Unusable
+        return 0;
     case 0xFF80 ... 0xFFFE: // HRAM
         return mmu->hram[addr - 0xFF80];
     case 0xFFFF: // Interrupt Enable
-        LOG("inte read: 0x%02X", mmu->inte);
-        return mmu->inte;
+        return mmu->IE;
     default:
         TRACE("unhandled read from 0x%04X", addr);
         return 0;
@@ -65,11 +63,6 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
 {
     switch (addr) {
     case 0x0000 ... 0x7FFF: // ROM
-        mapper_write(mmu->mapper, addr, data);
-        return;
-    case 0x8000 ... 0x9FFF: // VRAM
-        mmu->vram[addr - 0x8000] = data;
-        return;
     case 0xA000 ... 0xBFFF: // External RAM
         mapper_write(mmu->mapper, addr, data);
         return;
@@ -79,9 +72,6 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
     case 0xE000 ... 0xFDFF: // Internal RAM (mirror)
         mmu->ram[addr - 0xE000] = data;
         return;
-    case 0xFE00 ... 0xFE9F: // OAM
-        mmu->oam[addr - 0xFE00] = data;
-        return;
     case 0xFF01 ... 0xFF02: // Serial
         serial_write(&mmu->serial, addr, data);
         return;
@@ -89,14 +79,22 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
         timer_write(&mmu->timer, addr, data);
         return;
     case 0xFF0F: // Interrupt Flags
-        LOG("intf write: 0x%02X", data);
-        mmu->intf = data;
+        mmu->IF = data;
+        return;
+    case 0xFF10 ... 0xFF3F: // Sound
+        return;
+    case 0xFF40 ... 0xFF4B: // PPU registers
+    case 0x8000 ... 0x9FFF: // VRAM
+    case 0xFE00 ... 0xFE9F: // OAM
+        ppu_write(&mmu->ppu, addr, data);
+        return;
+    case 0xFEA0 ... 0xFEFF: // Unusable
+        return;
     case 0xFF80 ... 0xFFFE: // HRAM
         mmu->hram[addr - 0xFF80] = data;
         return;
     case 0xFFFF: // Interrupt Enable
-        LOG("inte write: 0x%02X", data);
-        mmu->inte = data & 0x1F;
+        mmu->IE = data & 0x1F;
         return;
     default:
         TRACE("unhandled write to 0x%04X", addr);

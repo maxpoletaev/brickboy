@@ -1,8 +1,8 @@
-#ifndef BRICKBOY_ROM_H
-#define BRICKBOY_ROM_H
+#pragma once
 
 #define ROM_MIN_SIZE (0x0100 + sizeof(ROMHeader))
 #define ROM_MAX_SIZE (2 * 1024 * 1024) // 2MB
+#define ROM_TITLE_SIZE 16
 
 #include <stdint.h>
 
@@ -22,7 +22,7 @@ typedef struct {
     uint8_t mask_rom_version;   // 0x014C
     uint8_t header_checksum;    // 0x014D
     uint16_t global_checksum;   // 0x014E - 0x014F
-} PACKED ROMHeader;
+} _packed_ ROMHeader;
 
 typedef struct {
     ROMHeader *header;
@@ -30,8 +30,6 @@ typedef struct {
     uint32_t size;
 } ROM;
 
-int rom_open(ROM *rom, const char *filename);
+int rom_init(ROM *rom, const char *filename);
 
-void rom_free(ROM *rom);
-
-#endif // BRICKBOY_ROM_H
+void rom_deinit(ROM *rom);

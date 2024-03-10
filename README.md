@@ -6,24 +6,40 @@ WIP Gameboy Emulator
 
 You will need `cmake`, `make` and a C compiler (GCC or Clang).
 
-## Blargg’s tests
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+```
+
+## Status
+
+ * [x] CPU
+ * [ ] Timer
+ * [ ] Background
+ * [ ] Window
+ * [ ] DMA
+ * [ ] Sprites
+ * [ ] Scrolling
+ * [ ] Sound
+ * [ ] Input
+ * [ ] Mappers
+ * [ ] Save states
+
+## CPU tests (Blargg's)
 
  - [x] 01-special
  - [ ] 02-interrupts
- - [ ] 03-op sp,hl
+ - [x] 03-op sp,hl
  - [x] 04-op r,imm
  - [x] 05-op rp
  - [x] 06-ld r,r
- - [ ] 07-jr,jp,call,ret,rst
- - [ ] 08-misc instrs
+ - [x] 07-jr,jp,call,ret,rst
+ - [x] 08-misc instrs
  - [x] 09-op r,r
  - [x] 10-bit ops
  - [x] 11-op a,(hl)
-
-```bash
-cmake .
-make
-```
 
 ## Resources
 
