@@ -6,6 +6,12 @@
 #include "common.h"
 #include "strbuf.h"
 
+struct Strbuf {
+    char *str;
+    size_t cap;
+    size_t pos; // position excluding null terminator < cap-1
+};
+
 static inline void
 strbuf_check(Strbuf *buf, size_t newpos)
 {
@@ -82,4 +88,10 @@ strbuf_clear(Strbuf *buf)
 {
     buf->pos = 0;
     buf->str[0] = '\0';
+}
+
+const char *
+strbuf_get(Strbuf *buf)
+{
+    return buf->str;
 }

@@ -38,13 +38,13 @@ ui_to_color(RGB pixel)
 }
 
 void
-ui_update_frame_view(RGB frame[144][160])
+ui_update_frame_view(const RGB *frame)
 {
     BeginTextureMode(ui.frame_texture);
 
     for (int y = 0; y < 144; y++) {
         for (int x = 0; x < 160; x++) {
-            ui.frame_pixels[y*160 + x] = ui_to_color(frame[y][x]);
+            ui.frame_pixels[y*160 + x] = ui_to_color(frame[y*160 + x]);
         }
     }
 
@@ -79,7 +79,7 @@ ui_draw_tile(const uint8_t *vram, int tile_num, int pos_x, int pos_y, Color *pix
 }
 
 void
-ui_update_debug_view(uint8_t *vram)
+ui_update_debug_view(const uint8_t *vram)
 {
     BeginTextureMode(ui.tileset_texture);
 

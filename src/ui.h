@@ -11,9 +11,9 @@
 
 void ui_init(void);
 
-void ui_update_frame_view(RGB frame[144][160]);
+void ui_update_frame_view(const RGB *frame);
 
-void ui_update_debug_view(uint8_t *vram);
+void ui_update_debug_view(const uint8_t *vram);
 
 void ui_refresh(void);
 

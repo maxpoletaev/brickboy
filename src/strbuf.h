@@ -3,11 +3,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef struct Strbuf {
-    char *str;
-    size_t cap;
-    size_t pos; // position excluding null terminator < cap-1
-} Strbuf;
+typedef struct Strbuf Strbuf;
 
 Strbuf *strbuf_new(size_t size);
 
@@ -21,3 +17,4 @@ void strbuf_pad(Strbuf *buf, size_t len, char pad);
 
 void strbuf_clear(Strbuf *buf);
 
+const char *strbuf_get(Strbuf *buf);

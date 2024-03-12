@@ -179,8 +179,4 @@ disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf)
     // CPU registers: A:00 B:00 C:00 D:00 E:00 H:00 L:00 SP:0000
     strbuf_addf(buf, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
                 cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP);
-
-    // PPU registers
-    strbuf_addf(buf, " LCDC:%02X STAT:%02X SCY:%02X SCX:%02X LY:%02X LYC:%02X",
-                mmu->ppu->LCDC.raw, mmu->ppu->STAT.raw, mmu->ppu->SCY, mmu->ppu->SCX, mmu->ppu->LY, mmu->ppu->LYC);
 }

@@ -6,6 +6,17 @@
 
 static const int timer_freqs[] = {1024, 16, 64, 256};
 
+struct Timer {
+    uint8_t divider; // DIV ($FF04)
+    uint8_t counter; // TIMA ($FF05)
+    uint8_t reload;  // TMA ($FF06)
+    uint8_t ctrl;    // TAC ($FF07)
+
+    bool interrupt;
+    int internal_divider;
+    int internal_counter;
+};
+
 Timer *
 timer_new(void)
 {
@@ -96,4 +107,15 @@ timer_step(Timer *t)
             }
         }
     }
+}
+
+inline bool
+timer_interrupt(Timer *t)
+{
+    if (t->interrupt) {
+        t->interrupt = false;
+        return true;
+    }
+
+    return false;
 }

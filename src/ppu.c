@@ -12,6 +12,64 @@ const RGB ppu_colors[4] = {
     {0, 0, 0},
 };
 
+enum PPUMode {
+    PPU_MODE_HBLANK = 0,
+    PPU_MODE_VBLANK = 1,
+    PPU_MODE_OAM_SCAN = 2,
+    PPU_MODE_PIXEL_DRAW = 3
+};
+
+union LCDCRegister {
+    uint8_t raw;
+    struct {
+        uint8_t bg_enable : 1;
+        uint8_t obj_enable : 1;
+        uint8_t obj_size : 1;
+        uint8_t bg_tilemap : 1;
+        uint8_t bg_tiledata : 1;
+        uint8_t win_enable : 1;
+        uint8_t win_tilemap : 1;
+        uint8_t lcd_enable : 1;
+    } _packed_;
+};
+
+union StatRegister {
+    uint8_t raw;
+    struct {
+        uint8_t mode : 2;
+        uint8_t lyc_ly_eq : 1;
+        uint8_t hblank_int : 1;
+        uint8_t vblank_int : 1;
+        uint8_t oam_int : 1;
+        uint8_t lyc_int : 1;
+        uint8_t _unused_ : 1;
+    } _packed_;
+};
+
+struct PPU {
+    RGB frame[144][160];
+    uint8_t vram[0x2000];
+    uint8_t oam[0xA0];
+
+    union LCDCRegister LCDC;
+    union StatRegister STAT;
+    uint8_t SCY;
+    uint8_t SCX;
+    uint8_t LY;
+    uint8_t LYC;
+    uint8_t DMA;
+    uint8_t BGP;
+    uint8_t OBP0;
+    uint8_t OBP1;
+    uint8_t WY;
+    uint8_t WX;
+
+    bool frame_complete;
+    bool vblank_interrupt;
+    bool stat_interrupt;
+    int line_ticks;
+};
+
 PPU *
 ppu_new(void)
 {
@@ -29,9 +87,6 @@ ppu_free(PPU **ppu)
 void
 ppu_reset(PPU *ppu)
 {
-    ppu->WX = 0;
-    ppu->WY = 0;
-
     memset(ppu->frame, 0x00, sizeof(ppu->frame));
     memset(ppu->vram, 0x00, sizeof(ppu->vram));
     memset(ppu->oam, 0x00, sizeof(ppu->oam));
@@ -43,6 +98,8 @@ ppu_reset(PPU *ppu)
     ppu->LY = 0;
     ppu->LYC = 0;
     ppu->DMA = 0;
+    ppu->WX = 0;
+    ppu->WY = 0;
 }
 
 uint8_t
@@ -220,7 +277,7 @@ ppu_render_scanline(PPU *ppu)
 }
 
 static inline void
-ppu_set_mode(PPU *ppu, PPUMode mode)
+ppu_set_mode(PPU *ppu, enum PPUMode mode)
 {
     switch (mode) {
     case PPU_MODE_OAM_SCAN:
@@ -328,4 +385,50 @@ ppu_step(PPU *ppu)
     default:
         PANIC("invalid PPU mode %d", ppu->STAT.mode);
     }
+}
+
+inline const RGB *
+ppu_get_frame(PPU *ppu)
+{
+    return (RGB *) ppu->frame;
+}
+
+inline const uint8_t *
+ppu_get_vram(PPU *ppu)
+{
+    return ppu->vram;
+}
+
+inline bool
+ppu_frame_complete(PPU *ppu)
+{
+    if (ppu->frame_complete) {
+        ppu->frame_complete = false;
+        return true;
+    }
+
+    return false;
+}
+
+inline bool
+ppu_stat_interrupt(PPU *ppu)
+{
+    if (ppu->stat_interrupt) {
+        ppu->stat_interrupt = false;
+        return true;
+    }
+
+    return false;
+
+}
+
+inline bool
+ppu_vblank_interrupt(PPU *ppu)
+{
+    if (ppu->vblank_interrupt) {
+        ppu->vblank_interrupt = false;
+        return true;
+    }
+
+    return false;
 }
