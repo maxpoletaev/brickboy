@@ -73,7 +73,7 @@ typedef struct PPU {
 
 void ppu_reset(PPU *ppu);
 
-void ppu_write(PPU *ppu, uint16_t addr, uint8_t val);
+void ppu_write(PPU *ppu, uint16_t addr, uint8_t data);
 
 uint8_t ppu_read(PPU *ppu, uint16_t addr);
 

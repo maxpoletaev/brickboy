@@ -5,7 +5,7 @@ GOLDEN_LOG="$2"
 TIMEOUT="${3:-5s}"
 STATE_LOG="state.log"
 DEBUG_LOG="debug.log"
-BRICKBOY_BIN="./cmake-build-debug/brickboy"
+BRICKBOY_BIN="./build/brickboy"
 
 if [[ $ROM_FILE == "" || $GOLDEN_LOG == "" ]]; then
     echo "Usage: $0 <rom_file> <golden_log>"

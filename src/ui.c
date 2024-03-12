@@ -53,7 +53,7 @@ ui_update_frame_view(RGB frame[144][160])
 }
 
 static void
-ui_draw_tile(uint8_t *vram, int tile_num, int pos_x, int pos_y, Color *pixels)
+ui_draw_tile(const uint8_t *vram, int tile_num, int pos_x, int pos_y, Color *pixels)
 {
     uint8_t tile[8][8];
 
@@ -100,12 +100,8 @@ static void
 ui_draw_overlay(void)
 {
     int fps = GetFPS();
-
-    Color text_color = WHITE;
-    if (fps < 58) text_color = RED;
-
     DrawText(strfmt("%d fps", fps), 3, 3, 10, BLACK);
-    DrawText(strfmt("%d fps", fps), 2, 2, 10, text_color);
+    DrawText(strfmt("%d fps", fps), 2, 2, 10, WHITE);
 }
 
 void

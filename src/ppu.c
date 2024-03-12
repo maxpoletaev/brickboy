@@ -175,6 +175,7 @@ ppu_render_scanline(PPU *ppu)
 {
     if (true) {
         uint8_t screen_y = ppu->LY;
+
         int tile_y = screen_y / 8;
         int pixel_y = screen_y % 8;
 
@@ -264,7 +265,7 @@ ppu_step_pixel_draw(PPU *ppu)
 static inline void
 ppu_step_hblank(PPU *ppu)
 {
-    if (ppu->line_ticks == 80+172+204) {
+    if (ppu->line_ticks == 456) {
         ppu_ly_increment(ppu);
         ppu->line_ticks = 0;
 

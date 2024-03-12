@@ -48,9 +48,13 @@ output_file(const char *filename)
 {
     if (strcmp(filename, "-") == 0 || strcmp(filename, "stdout") == 0) {
         return stdout;
-    } else if (strcmp(filename, "stderr") == 0) {
+    }
+
+    if (strcmp(filename, "stderr") == 0) {
         return stderr;
-    } else if (access(filename, W_OK) != 0) { // NOLINT(misc-include-cleaner): W_OK is defined in unistd.h
+    }
+
+    if (access(filename, W_OK) != 0) { // NOLINT(misc-include-cleaner): W_OK is defined in unistd.h
         LOG("file not writable: %s", filename);
         return NULL;
     }
@@ -105,21 +109,22 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
     ui_init();
 
     uint64_t ticks = 0;
-    uint64_t frame_count = 0;
 
     while (true) {
-        if (debug_out != NULL) {
-            strbuf_clear(disasm_buf);
-            disasm_step(mmu, cpu, disasm_buf);
-            fputs(disasm_buf->str, debug_out);
-            fputc('\n', debug_out);
-        }
-
-        if (state_out != NULL) {
-            print_state(cpu, mmu, state_out);
-        }
-
         if (ticks%4 == 0) {
+            if (cpu->step == 0) {
+                if (state_out != NULL) {
+                    print_state(cpu, mmu, state_out);
+                }
+
+                if (debug_out != NULL) {
+                    strbuf_clear(disasm_buf);
+                    disasm_step(mmu, cpu, disasm_buf);
+                    fputs(disasm_buf->str, debug_out);
+                    fputc('\n', debug_out);
+                }
+            }
+
             cpu_step(cpu, mmu);
         }
 
@@ -153,7 +158,6 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
             ui_refresh();
 
             mmu->ppu.frame_complete = false;
-            frame_count++;
         }
 
         if (ui_should_close()) {
@@ -198,7 +202,7 @@ main(int argc, char **argv)
 
     // Disassembly buffer (for debug output)
     Strbuf disasm_buf _cleanup_(strbuf_free) = {0};
-    if (debug_out != NULL) disasm_buf = strbuf_new(512);
+    disasm_buf = strbuf_new(1024);
 
     // ROM file loading
     ROM rom _cleanup_(rom_deinit) = {0};

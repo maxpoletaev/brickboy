@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "cpu.h"
 #include "common.h"
+#include "cpu.h"
 #include "mmu.h"
 
 static const uint16_t reset_addr[8] = {
@@ -238,7 +238,7 @@ cpu_set_operand(CPU *cpu, MMU *bus, ArgType target, uint16_t value16)
 static uint8_t
 cpu_getbit(CPU *cpu, MMU *bus, ArgType arg, uint8_t bit)
 {
-    uint8_t value = (uint8_t) cpu_get_operand(cpu, bus, arg);
+    uint8_t value = cpu_get_operand(cpu, bus, arg);
     return (value >> bit&7) & 1;
 }
 
@@ -248,8 +248,8 @@ cpu_setbit(CPU *cpu, MMU *bus, ArgType arg, uint8_t bit, uint8_t value)
     uint8_t v = (uint8_t) cpu_get_operand(cpu, bus, arg);
 
     bit &= 7;
-    value &= 1;
-    v &= ~(1 << bit) | (value << bit);
+    v &= ~(1 << bit);
+    v |= (value & 1) << bit;
 
     cpu_set_operand(cpu, bus, arg, v);
 }
@@ -342,7 +342,6 @@ cpu_step(CPU *cpu, MMU *bus)
     }
 
     const Instruction *op = cpu_execute(cpu, bus);
-
     cpu->step = op->cycles - 1;
 }
 
@@ -844,8 +843,9 @@ pop16(CPU *cpu, MMU *bus, const Instruction *op)
 {
     uint16_t v = cpu_pop(cpu, bus);
 
-    if (op->arg1 == ARG_REG_AF)
+    if (op->arg1 == ARG_REG_AF) {
         v &= 0xFFF0; // lower 4 bits of F are always zero
+    }
 
     cpu_set_operand(cpu, bus, op->arg1, v);
 }
@@ -867,7 +867,7 @@ call(CPU *cpu, MMU *bus, const Instruction *op)
 static void
 call_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
-    bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
+    bool flag = cpu_get_operand(cpu, bus, op->arg1) != 0;
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (flag) {
@@ -883,7 +883,7 @@ call_if(CPU *cpu, MMU *bus, const Instruction *op)
 static void
 call_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
-    bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
+    bool flag = cpu_get_operand(cpu, bus, op->arg1) != 0;
     uint16_t addr = cpu_get_operand(cpu, bus, op->arg2);
 
     if (!flag) {
@@ -911,7 +911,7 @@ ret(CPU *cpu, MMU *bus, const Instruction *op)
 static void
 ret_if(CPU *cpu, MMU *bus, const Instruction *op)
 {
-    bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
+    bool flag = cpu_get_operand(cpu, bus, op->arg1);
 
     if (flag) {
         cpu->PC = cpu_pop(cpu, bus);
@@ -925,7 +925,7 @@ ret_if(CPU *cpu, MMU *bus, const Instruction *op)
 static void
 ret_ifn(CPU *cpu, MMU *bus, const Instruction *op)
 {
-    bool flag = (bool) cpu_get_operand(cpu, bus, op->arg1);
+    bool flag = cpu_get_operand(cpu, bus, op->arg1);
 
     if (!flag) {
         cpu->PC = cpu_pop(cpu, bus);

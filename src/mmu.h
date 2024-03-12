@@ -9,7 +9,7 @@
 #include "ppu.h"
 
 typedef struct MMU {
-    Mapper *mapper;        // Cartridge ROM (0x0000 - 0x7FFF) + ERAM (0xA000 - 0xBFFF)
+    Mapper *mapper;       // Cartridge ROM (0x0000 - 0x7FFF) + ERAM (0xA000 - 0xBFFF)
     uint8_t ram[0x2000];  // 8KB WRAM (0xC000 - 0xDFFF) + Mirror (0xE000 - 0xFDFF)
     uint8_t hram[0x7F];   // 127B HRAM (0xFF80 - 0xFFFE)
     Serial serial;        // Serial (0xFF01-0xFF02)

@@ -19,7 +19,7 @@
 #define PANIC(fmt, ...) \
     do { \
         fprintf(stderr, "panic: " fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__); \
-        abort(); \
+        exit(3); \
     } while (0)
 
 // Format a string intended for temporary use (e.g. logging).
