@@ -19,6 +19,7 @@
 #include "rom.h"
 #include "ppu.h"
 #include "ui.h"
+#include "mbc0.h"
 
 static void
 bitfield_test(void)
@@ -128,36 +129,36 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
             cpu_step(cpu, mmu);
         }
 
-        ppu_step(&mmu->ppu);
-        timer_step(&mmu->timer);
+        ppu_step(mmu->ppu);
+        timer_step(mmu->timer);
 
         // VBLANK interrupt requested
-        if (mmu->ppu.vblank_interrupt) {
+        if (mmu->ppu->vblank_interrupt) {
             mmu->IF |= INT_VBLANK;
-            mmu->ppu.vblank_interrupt = false;
+            mmu->ppu->vblank_interrupt = false;
         }
 
         // LCD STAT interrupt requested
-        if (mmu->ppu.stat_interrupt) {
+        if (mmu->ppu->stat_interrupt) {
             mmu->IF |= INT_LCD_STAT;
-            mmu->ppu.stat_interrupt = false;
+            mmu->ppu->stat_interrupt = false;
         }
 
         // Timer interrupt requested
-        if (mmu->timer.interrupt) {
+        if (mmu->timer->interrupt) {
             mmu->IF |= INT_TIMER;
-            mmu->timer.interrupt = false;
+            mmu->timer->interrupt = false;
         }
 
-        serial_print(&mmu->serial);
+        serial_print(mmu->serial);
         handle_interrupts(cpu, mmu);
 
-        if (mmu->ppu.frame_complete) {
-            ui_update_debug_view(mmu->ppu.vram);
-            ui_update_frame_view(mmu->ppu.frame);
+        if (mmu->ppu->frame_complete) {
+            ui_update_debug_view(mmu->ppu->vram);
+            ui_update_frame_view(mmu->ppu->frame);
             ui_refresh();
 
-            mmu->ppu.frame_complete = false;
+            mmu->ppu->frame_complete = false;
         }
 
         if (ui_should_close()) {
@@ -166,6 +167,18 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
     }
 
     ui_close();
+}
+
+static IMapper *
+get_mapper(ROM *rom)
+{
+    switch (rom->header->type) {
+    case ROM_TYPE_ROM_ONLY:
+        return mbc0_create(rom);
+    default:
+        LOG("unknown mapper: %02X, fallback to MBC0", rom->header->type);
+        return mbc0_create(rom);
+    }
 }
 
 int
@@ -200,35 +213,27 @@ main(int argc, char **argv)
         }
     }
 
-    // Disassembly buffer (for debug output)
-    Strbuf disasm_buf _cleanup_(strbuf_free) = {0};
-    disasm_buf = strbuf_new(1024);
-
-    // ROM file loading
-    ROM rom _cleanup_(rom_deinit) = {0};
-    if (rom_init(&rom, opts.romfile) != RET_OK) {
+    ROM *rom _cleanup_(rom_free) = rom_open(opts.romfile);
+    if (rom == NULL) {
         LOG("failed to open rom file: %s", opts.romfile);
         exit(1);
     }
 
-    // Mapper initialization
-    Mapper mapper _cleanup_(mapper_deinit) = {0};
-    if (mapper_init(&mapper, &rom) != RET_OK) {
-        LOG("failed to initialize mapper");
-        exit(1);
-    }
+    CPU *cpu _cleanup_(cpu_free) = cpu_new();
 
-    // Memory bus initialization
-    MMU mmu = {0};
-    mmu.mapper = &mapper;
-    mmu_reset(&mmu);
+    PPU *ppu _cleanup_(ppu_free) = ppu_new();
 
-    // CPU initialization
-    CPU cpu = {0};
-    cpu_reset(&cpu);
+    Timer *timer _cleanup_(timer_free) = timer_new();
 
-    // Run the game loop
-    game_loop(&cpu, &mmu, &disasm_buf, debug_out, state_out);
+    Serial *serial _cleanup_(serial_free) = serial_new();
+
+    Strbuf *disasm_buf _cleanup_(strbuf_free) = strbuf_new(1024);
+
+    IMapper *mapper _cleanup_(mapper_free) = get_mapper(rom);
+
+    MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu);
+
+    game_loop(cpu, mmu, disasm_buf, debug_out, state_out);
 
     return 0;
 }

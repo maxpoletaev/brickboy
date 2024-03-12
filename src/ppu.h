@@ -71,6 +71,10 @@ typedef struct PPU {
     int line_ticks;
 } PPU;
 
+PPU *ppu_new(void);
+
+void ppu_free(PPU **ppu);
+
 void ppu_reset(PPU *ppu);
 
 void ppu_write(PPU *ppu, uint16_t addr, uint8_t data);

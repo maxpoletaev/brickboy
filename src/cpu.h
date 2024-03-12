@@ -146,6 +146,10 @@ struct Instruction {
     const char *text;
 };
 
+CPU *cpu_new(void);
+
+void cpu_free(CPU **cpu);
+
 void cpu_reset(CPU *cpu);
 
 void cpu_step(CPU *cpu, MMU *bus);

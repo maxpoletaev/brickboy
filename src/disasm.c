@@ -182,5 +182,5 @@ disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf)
 
     // PPU registers
     strbuf_addf(buf, " LCDC:%02X STAT:%02X SCY:%02X SCX:%02X LY:%02X LYC:%02X",
-                mmu->ppu.LCDC.raw, mmu->ppu.STAT.raw, mmu->ppu.SCY, mmu->ppu.SCX, mmu->ppu.LY, mmu->ppu.LYC);
+                mmu->ppu->LCDC.raw, mmu->ppu->STAT.raw, mmu->ppu->SCY, mmu->ppu->SCX, mmu->ppu->LY, mmu->ppu->LYC);
 }

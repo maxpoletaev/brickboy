@@ -8,12 +8,29 @@
 #include "serial.h"
 #include "ppu.h"
 
+MMU *
+mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu)
+{
+    MMU *mmu = xalloc(sizeof(MMU));
+    mmu->mapper = mapper;
+    mmu->serial = serial;
+    mmu->timer = timer;
+    mmu->ppu = ppu;
+    mmu_reset(mmu);
+    return mmu;
+}
+
+void mmu_free(MMU **mmu)
+{
+    xfree(*mmu);
+}
+
 void
 mmu_reset(MMU *mmu)
 {
-    ppu_reset(&mmu->ppu);
-    timer_reset(&mmu->timer);
-    serial_reset(&mmu->serial);
+    ppu_reset(mmu->ppu);
+    timer_reset(mmu->timer);
+    serial_reset(mmu->serial);
     mapper_reset(mmu->mapper);
 
     memset(mmu->ram, 0x00, sizeof(mmu->ram));
@@ -35,9 +52,9 @@ mmu_read(MMU *mmu, uint16_t addr)
     case 0xE000 ... 0xFDFF: // Internal RAM (mirror)
         return mmu->ram[addr - 0xE000];
     case 0xFF01 ... 0xFF02: // Serial
-        return serial_read(&mmu->serial, addr);
+        return serial_read(mmu->serial, addr);
     case 0xFF04 ... 0xFF07: // Timer
-        return timer_read(&mmu->timer, addr);
+        return timer_read(mmu->timer, addr);
     case 0xFF0F: // Interrupt Flags
         return mmu->IF;
     case 0xFF10 ... 0xFF3F: // Sound
@@ -45,7 +62,7 @@ mmu_read(MMU *mmu, uint16_t addr)
     case 0xFF40 ... 0xFF4B: // PPU registers
     case 0x8000 ... 0x9FFF: // VRAM
     case 0xFE00 ... 0xFE9F: // OAM
-        return ppu_read(&mmu->ppu, addr);
+        return ppu_read(mmu->ppu, addr);
     case 0xFEA0 ... 0xFEFF: // Unusable
         return 0;
     case 0xFF80 ... 0xFFFE: // HRAM
@@ -73,10 +90,10 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
         mmu->ram[addr - 0xE000] = data;
         return;
     case 0xFF01 ... 0xFF02: // Serial
-        serial_write(&mmu->serial, addr, data);
+        serial_write(mmu->serial, addr, data);
         return;
     case 0xFF04 ... 0xFF07: // Timer
-        timer_write(&mmu->timer, addr, data);
+        timer_write(mmu->timer, addr, data);
         return;
     case 0xFF0F: // Interrupt Flags
         mmu->IF = data;
@@ -86,7 +103,7 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
     case 0xFF40 ... 0xFF4B: // PPU registers
     case 0x8000 ... 0x9FFF: // VRAM
     case 0xFE00 ... 0xFE9F: // OAM
-        ppu_write(&mmu->ppu, addr, data);
+        ppu_write(mmu->ppu, addr, data);
         return;
     case 0xFEA0 ... 0xFEFF: // Unusable
         return;

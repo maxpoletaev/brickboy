@@ -12,6 +12,20 @@ static const uint16_t reset_addr[8] = {
     0x20, 0x28, 0x30, 0x38,
 };
 
+CPU *
+cpu_new(void)
+{
+    CPU *cpu = xalloc(sizeof(CPU));
+    cpu_reset(cpu);
+    return cpu;
+}
+
+void
+cpu_free(CPU **cpu)
+{
+    xfree(*cpu);
+}
+
 void
 cpu_reset(CPU *cpu)
 {

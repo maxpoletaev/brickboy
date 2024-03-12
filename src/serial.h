@@ -17,6 +17,10 @@ typedef struct Serial {
     };
 } Serial;
 
+Serial *serial_new(void);
+
+void serial_free(Serial **s);
+
 void serial_reset(Serial *s);
 
 uint8_t serial_read(Serial *s, uint16_t addr);

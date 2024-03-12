@@ -14,6 +14,10 @@ typedef struct Timer {
     int internal_counter;
 } Timer;
 
+Timer *timer_new(void);
+
+void timer_free(Timer **t);
+
 void timer_reset(Timer *t);
 
 uint8_t timer_read(Timer *t, uint16_t addr);

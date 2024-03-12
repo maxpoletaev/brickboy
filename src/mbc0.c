@@ -6,45 +6,42 @@
 #include "mapper.h"
 #include "rom.h"
 
-const MapperVT mbc0_vtable = {
-    .init = mbc0_init,
+static IMapper mbc0_mapper = {
+    .id = 0x00,
+    .name = "MBC0",
     .write = mbc0_write,
     .read = mbc0_read,
     .reset = mbc0_reset,
-    .deinit = mbc0_deinit,
+    .free = mbc0_free,
 };
 
-static inline MBC0 *
-mbc0_impl(Mapper *mapper)
+IMapper *
+mbc0_create(ROM *rom)
 {
-    return (MBC0 *) mapper->impl;
-}
-
-int
-mbc0_init(Mapper *mapper, ROM *rom)
-{
-    MBC0 *impl = mbc0_impl(mapper);
+    MBC0 *impl = xalloc(sizeof(MBC0));
+    impl->mapper = mbc0_mapper;
     impl->rom = rom;
 
-    return RET_OK;
+    return &impl->mapper;
 }
 
 void
-mbc0_deinit(Mapper *mapper)
+mbc0_free(IMapper *mapper)
 {
-    UNUSED(mapper);
+    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
+    xfree(impl);
 }
 
 void
-mbc0_reset(Mapper *mapper)
+mbc0_reset(IMapper *mapper)
 {
     UNUSED(mapper);
 }
 
 uint8_t
-mbc0_read(Mapper *mapper, uint16_t addr)
+mbc0_read(IMapper *mapper, uint16_t addr)
 {
-    MBC0 *impl = mbc0_impl(mapper);
+    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
 
     if (addr >= impl->rom->size) {
         PANIC("out of bounds read at 0x%04X", addr);
@@ -54,9 +51,9 @@ mbc0_read(Mapper *mapper, uint16_t addr)
 }
 
 void
-mbc0_write(Mapper *mapper, uint16_t addr, uint8_t data)
+mbc0_write(IMapper *mapper, uint16_t addr, uint8_t data)
 {
-    MBC0 *impl = mbc0_impl(mapper);
+    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
 
     if (addr >= impl->rom->size) {
         PANIC("out of bounds write at 0x%04X", addr);

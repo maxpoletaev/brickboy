@@ -6,17 +6,16 @@
 #include "mapper.h"
 
 typedef struct {
+    IMapper mapper;
     ROM *rom;
 } MBC0;
 
-const MapperVT mbc0_vtable;
+IMapper *mbc0_create(ROM *ROM);
 
-int mbc0_init(Mapper *mapper, ROM *rom);
+void mbc0_write(IMapper *mapper, uint16_t addr, uint8_t data);
 
-void mbc0_write(Mapper *mapper, uint16_t addr, uint8_t data);
+uint8_t mbc0_read(IMapper *mapper, uint16_t addr);
 
-uint8_t mbc0_read(Mapper *mapper, uint16_t addr);
+void mbc0_free(IMapper *mapper);
 
-void mbc0_deinit(Mapper *mapper);
-
-void mbc0_reset(Mapper *mapper);
+void mbc0_reset(IMapper *mapper);

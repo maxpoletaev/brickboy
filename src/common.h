@@ -14,6 +14,8 @@
 
 #define TRACE(fmt, ...) fprintf(stderr, fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__)
 
+#define CONTAINER_OF(ptr, type, member) ((type *) ((char *) (ptr) - offsetof(type, member)))
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #define PANIC(fmt, ...) \

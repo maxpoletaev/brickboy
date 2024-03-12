@@ -6,6 +6,20 @@
 
 static const int timer_freqs[] = {1024, 16, 64, 256};
 
+Timer *
+timer_new(void)
+{
+    Timer *t = xalloc(sizeof(Timer));
+    timer_reset(t);
+    return t;
+}
+
+void
+timer_free(Timer **t)
+{
+    xfree(*t);
+}
+
 void
 timer_reset(Timer *t)
 {

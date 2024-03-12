@@ -12,6 +12,20 @@ const RGB ppu_colors[4] = {
     {0, 0, 0},
 };
 
+PPU *
+ppu_new(void)
+{
+    PPU *ppu = xalloc(sizeof(PPU));
+    ppu_reset(ppu);
+    return ppu;
+}
+
+void
+ppu_free(PPU **ppu)
+{
+    xfree(*ppu);
+}
+
 void
 ppu_reset(PPU *ppu)
 {
@@ -144,9 +158,9 @@ ppu_tile_addr(PPU *ppu, uint8_t tile_id)
 {
     if (ppu->LCDC.bg_tiledata == 0) {
         return 0x8000 + tile_id*16;
-    } else {
-        return 0x8800 + (int8_t)tile_id * 16;
     }
+
+    return 0x8800 + (int8_t)tile_id * 16;
 }
 
 static void

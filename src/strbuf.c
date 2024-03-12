@@ -14,22 +14,22 @@ strbuf_check(Strbuf *buf, size_t newpos)
     }
 }
 
-Strbuf
+Strbuf *
 strbuf_new(size_t size)
 {
-    return (Strbuf) {
-        .str = xalloc(size),
-        .cap = size,
-        .pos = 0,
-    };
+    Strbuf *buf = xalloc(sizeof(Strbuf));
+    buf->str = xalloc(size);
+    buf->cap = size;
+    buf->pos = 0;
+
+    return buf;
 }
 
 void
-strbuf_free(Strbuf *buf)
+strbuf_free(Strbuf **buf)
 {
-    xfree(buf->str);
-    buf->cap = 0;
-    buf->pos = 0;
+    xfree((*buf)->str);
+    xfree(*buf);
 }
 
 void

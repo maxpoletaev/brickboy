@@ -1,12 +1,17 @@
 #pragma once
 
+#include <stdint.h>
+
+#include "common.h"
+
 #define ROM_MIN_SIZE (0x0100 + sizeof(ROMHeader))
 #define ROM_MAX_SIZE (2 * 1024 * 1024) // 2MB
 #define ROM_TITLE_SIZE 16
 
-#include <stdint.h>
-
-#include "common.h"
+enum ROMType {
+    ROM_TYPE_ROM_ONLY = 0x00,
+    ROM_TYPE_MBC1 = 0x01,
+};
 
 typedef struct {
     uint8_t entry_point[4];     // 0x0100 - 0x0103
@@ -30,6 +35,6 @@ typedef struct {
     uint32_t size;
 } ROM;
 
-int rom_init(ROM *rom, const char *filename);
+ROM *rom_open(const char *filename);
 
-void rom_deinit(ROM *rom);
+void rom_free(ROM **rom);
