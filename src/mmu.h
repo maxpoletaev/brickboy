@@ -22,7 +22,8 @@ typedef struct MMU {
     uint8_t IE;           // Interrupt Enable (0xFFFF)
 
     bool bootrom_mapped;
-    bool fixed_ly;
+    uint8_t dma_cycles;
+    uint8_t dma_page;
 } MMU;
 
 MMU *mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu);
@@ -38,3 +39,5 @@ void mmu_write(MMU *mmu, uint16_t addr, uint8_t data);
 uint16_t mmu_read16(MMU *mmu, uint16_t addr);
 
 void mmu_write16(MMU *mmu, uint16_t addr, uint16_t data);
+
+void mmu_dma_tick(MMU *mmu);

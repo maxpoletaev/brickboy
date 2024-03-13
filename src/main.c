@@ -121,7 +121,7 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
 
     while (true) {
         if (ticks%4 == 0) {
-            if (cpu->step == 0) {
+            if (cpu->step == 0 && !cpu->halted) {
                 if (state_out != NULL) {
                     print_state(cpu, mmu, state_out);
                 }
@@ -132,13 +132,19 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
                     fputs(strbuf_get(disasm_buf), debug_out);
                     fputc('\n', debug_out);
                 }
+
+                serial_print(mmu->serial);
             }
 
+            // CPU is clocked at 1/4 of the master clock.
+            handle_interrupts(cpu, mmu);
             cpu_step(cpu, mmu);
         }
 
-        ppu_step(mmu->ppu);
+        // PPU and timer run at the master clock.
         timer_step(mmu->timer);
+        ppu_step(mmu->ppu);
+        mmu_dma_tick(mmu);
 
         // VBLANK interrupt requested
         if (ppu_vblank_interrupt(mmu->ppu)) {
@@ -155,18 +161,17 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
             mmu->IF |= INT_TIMER;
         }
 
-        serial_print(mmu->serial);
-        handle_interrupts(cpu, mmu);
-
         if (ppu_frame_complete(mmu->ppu)) {
+            if (ui_should_close()) {
+                break;
+            }
+
             ui_update_debug_view(ppu_get_vram(mmu->ppu));
             ui_update_frame_view(ppu_get_frame(mmu->ppu));
             ui_refresh();
         }
 
-        if (ui_should_close()) {
-            break;
-        }
+        ticks++;
     }
 
     ui_close();

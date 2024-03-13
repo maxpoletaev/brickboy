@@ -84,6 +84,11 @@ mmu_read(MMU *mmu, uint16_t addr)
 void
 mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
 {
+    if (addr == 0xFF46) {
+        mmu->dma_cycles = 160;
+        mmu->dma_page = data;
+    }
+
     switch (addr) {
     case 0x0000 ... 0x7FFF: // ROM
     case 0xA000 ... 0xBFFF: // External RAM
@@ -139,4 +144,24 @@ mmu_write16(MMU *mmu, uint16_t addr, uint16_t data)
 {
     mmu_write(mmu, addr + 0, (uint8_t) (data >> 0));
     mmu_write(mmu, addr + 1, (uint8_t) (data >> 8));
+}
+
+static void
+mmu_dma(MMU *mmu, uint16_t page)
+{
+    uint16_t addr = page << 8;
+    for (int i = 0; i < 0xA0; i++) {
+        mmu_write(mmu, 0xFE00 + i, mmu_read(mmu, addr + i));
+    }
+}
+
+void
+mmu_dma_tick(MMU *mmu)
+{
+    if (mmu->dma_cycles > 0) {
+        mmu->dma_cycles--;
+        if (mmu->dma_cycles == 0) {
+            mmu_dma(mmu, mmu->dma_page);
+        }
+    }
 }
