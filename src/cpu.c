@@ -37,8 +37,8 @@ cpu_reset(CPU *cpu)
     cpu->PC = 0x0100; // skip the boot rom for now
     cpu->IME = 0;
 
-    cpu->cycle = 0;
     cpu->ime_delay = -1;
+    cpu->cycle = 0;
     cpu->step = 0;
 }
 
@@ -478,6 +478,22 @@ ld16(CPU *cpu, MMU *bus, const Instruction *op)
     cpu_set_operand(cpu, bus, op->arg1, v);
 }
 
+/* LD (a16),SP
+ * Flags: - - - -
+ * Store lower 8 bits of SP at address (a16), and the upper 8 bits at address (a16+1). */
+static void
+ld16_sp(CPU *cpu, MMU *bus, const Instruction *op)
+{
+    UNUSED(op);
+
+    uint16_t addr = mmu_read16(bus, cpu->PC);
+    uint16_t sp = cpu->SP;
+    cpu->PC += 2;
+
+    mmu_write(bus, addr, sp&0xFF);
+    mmu_write(bus, addr + 1, sp >> 8);
+}
+
 /* LD HL,SP+s8
  * Flags: 0 0 H C
  * Load SP + signed 8-bit immediate into HL. */
@@ -487,14 +503,15 @@ ld_hl_sp(CPU *cpu, MMU *bus, const Instruction *op)
     int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t sp = cpu->SP;
 
-    int32_t sum = (int32_t) sp + (int32_t) v;
+    uint16_t sum8 = (uint16_t) (sp&0xFF) + (uint16_t) (v&0xFF);
+    int32_t sum16 = (int32_t) sp + (int32_t) v;
     uint8_t half_sum = (sp&0xF) + (v&0xF);
-    uint16_t r = (uint16_t) sum;
+    uint16_t r = (uint16_t) sum16;
 
     cpu->flags.zero = 0;
     cpu->flags.negative = 0;
     cpu->flags.half_carry = half_sum > 0xF;
-    cpu->flags.carry = sum > 0xFF;
+    cpu->flags.carry = sum8 > 0xFF;
 
     cpu->HL = r;
 }
@@ -609,14 +626,15 @@ add_sp(CPU *cpu, MMU *bus, const Instruction *op)
     int8_t v = (int8_t) cpu_get_operand(cpu, bus, op->arg1);
     uint16_t sp = cpu->SP;
 
-    int32_t sum = (int32_t) sp + (int32_t) v;
+    uint16_t sum8 = (uint16_t) (sp&0xFF) + (uint16_t) (v&0xFF);
+    int32_t sum16 = (int32_t) sp + (int32_t) v;
     uint8_t half_sum = (sp&0xF) + (v&0xF);
-    uint16_t r = (uint16_t) sum;
+    uint16_t r = (uint16_t) sum16;
 
     cpu->flags.zero = 0;
     cpu->flags.negative = 0;
     cpu->flags.half_carry = half_sum > 0xF;
-    cpu->flags.carry = sum > 0xFFFF;
+    cpu->flags.carry = sum8 > 0xFF;
 
     cpu->SP = r;
 }
@@ -1360,7 +1378,7 @@ const Instruction opcodes[256] = {
     OPCODE(0xFA, REG_A, IND_16, ld8, 4, "LD A,($%04X)"),
     OPCODE(0x06, REG_B, IMM_8, ld8, 2, "LD B,$%02X"),
     OPCODE(0xE2, IND_C, REG_A, ld8, 2, "LD (C),A"),
-    OPCODE(0xF2, REG_C, IMM_8, ld8, 2, "LD C,$%02X"),
+    OPCODE(0xF2, REG_A, IND_C, ld8, 2, "LD A,(C)"),
     OPCODE(0x0E, REG_C, IMM_8, ld8, 2, "LD C,$%02X"),
     OPCODE(0x16, REG_D, IMM_8, ld8, 2, "LD D,$%02X"),
     OPCODE(0x1E, REG_E, IMM_8, ld8, 2, "LD E,$%02X"),
@@ -1373,8 +1391,8 @@ const Instruction opcodes[256] = {
     OPCODE(0x11, REG_DE, IMM_16, ld16, 3, "LD DE,$%04X"),
     OPCODE(0x21, REG_HL, IMM_16, ld16, 3, "LD HL,$%04X"),
     OPCODE(0x31, REG_SP, IMM_16, ld16, 3, "LD SP,$%04X"),
-    OPCODE(0x08, IND_16, REG_SP, ld16, 5, "LD ($%04X),SP"),
     OPCODE(0xF9, REG_SP, REG_HL, ld16, 2, "LD SP,HL"),
+    OPCODE(0x08, NONE, NONE, ld16_sp, 5, "LD ($%04X),SP"),
     OPCODE(0xF8, IMM_8, NONE, ld_hl_sp, 3, "LD HL,SP+$%02X"),
 
     OPCODE(0x80, REG_B, NONE, add_a, 1, "ADD A,B"),

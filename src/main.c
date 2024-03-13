@@ -24,13 +24,21 @@
 static void
 bitfield_test(void)
 {
-    // union LCDCRegister lcdc = {0};
-    // lcdc.raw = 0x01;
+    union {
+        struct {
+            uint32_t a : 8;
+            uint32_t b : 8;
+            uint32_t c : 8;
+            uint32_t d : 8;
+        } _packed_;
+        uint32_t raw;
+    } test;
 
-    // // Make sure bitfields are mapped correctly.
-    // if (!(lcdc.bg_enable == 1 && lcdc.lcd_enable == 0)) {
-    //     PANIC("bitfield test failed");
-    // }
+    test.raw = 0x01020304;
+
+    if (test.a != 0x04 || test.b != 0x03 || test.c != 0x02 || test.d != 0x01) {
+        PANIC("Byte order test failed");
+    }
 }
 
 static void

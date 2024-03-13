@@ -131,8 +131,6 @@ typedef enum {
     ARG_RST_7, // $38
 } ArgType;
 
-typedef struct MMU Bus;
-
 typedef struct Instruction Instruction;
 
 typedef void (*Handler)(CPU *cpu, MMU *bus, const Instruction *instr);

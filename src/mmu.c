@@ -43,6 +43,12 @@ mmu_reset(MMU *mmu)
 uint8_t
 mmu_read(MMU *mmu, uint16_t addr)
 {
+#if MMU_FIXED_LY
+    if (addr == 0xFF44) {
+        return 0x90;
+    }
+#endif
+
     switch (addr) {
     case 0x0000 ... 0x7FFF: // ROM
     case 0xA000 ... 0xBFFF: // External RAM
@@ -123,8 +129,8 @@ uint16_t
 mmu_read16(MMU *mmu, uint16_t addr)
 {
     uint16_t val = 0;
-    val |= (uint16_t) (mmu_read(mmu, addr + 0) << 0);
-    val |= (uint16_t) (mmu_read(mmu, addr + 1) << 8);
+    val |= (uint16_t) mmu_read(mmu, addr + 0) << 0;
+    val |= (uint16_t) mmu_read(mmu, addr + 1) << 8;
     return val;
 }
 

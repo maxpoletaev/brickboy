@@ -29,7 +29,7 @@ opts_help(void)
     printf("Debug Options:\n");
     printf("  -d, --debug <debug_out>  Enable debug mode (disassemble each instruction before executing it)\n");
     printf("  -l, --state <state_out>  Enable state log mode (log CPU state after each instruction)\n");
-    printf("  --slow                   Slow down the emulation speed\n");
+    printf("  --test                   Fixed LY=0x90\n");
 }
 
 static const struct option opts_long[] = {
@@ -37,10 +37,8 @@ static const struct option opts_long[] = {
 
     {"debug", required_argument, NULL, 'd'},
     {"state", required_argument, NULL, 'l'},
-    {"breakpoint", required_argument, NULL, 'b'},
-    {"debug-serial", no_argument, NULL, 0},
     {"nologo", no_argument, NULL, 0},
-    {"slow", no_argument, NULL, 0},
+    {"test", no_argument, NULL, 0},
 
     {NULL, 0, NULL, 0},
 };
@@ -50,7 +48,7 @@ opts_parse(Opts *opts, int argc, char **argv)
 {
     while (1) {
         int opt_index = 0;
-        int opt = getopt_long(argc, argv, "hd:l:b:",
+        int opt = getopt_long(argc, argv, "hd:l:b:t",
                               opts_long, &opt_index);
 
         if (opt == -1) {

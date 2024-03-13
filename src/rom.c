@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/_types/_null.h>
 #include <sys/stat.h>
 
 #include "common.h"
@@ -65,7 +64,7 @@ rom_open(const char *filename)
     }
 
     const char *title = rom_title(rom);
-    LOG("rom loaded: %s", title);
+    LOG("rom loaded: %s (TYPE:%02X)", title, rom->header->type);
 
     return rom;
 

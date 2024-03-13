@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "rom.h"
@@ -7,6 +8,8 @@
 #include "mapper.h"
 #include "serial.h"
 #include "ppu.h"
+
+#define MMU_FIXED_LY 0
 
 typedef struct MMU {
     IMapper *mapper;      // Cartridge ROM (0x0000 - 0x7FFF) + ERAM (0xA000 - 0xBFFF)
@@ -17,6 +20,9 @@ typedef struct MMU {
     PPU *ppu;             // PPU (0xFF40 - 0xFF4B) + VRAM (0x8000 - 0x9FFF) + OAM (0xFE00 - 0xFE9F)
     uint8_t IF;           // Interrupt Flags (0xFF0F)
     uint8_t IE;           // Interrupt Enable (0xFFFF)
+
+    bool bootrom_mapped;
+    bool fixed_ly;
 } MMU;
 
 MMU *mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu);
