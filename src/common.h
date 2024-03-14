@@ -60,3 +60,6 @@ void fclose_ptr(FILE **p);
 
 // Mark a function as unused to suppress warnings.
 #define _unused_ __attribute__((unused))
+
+// Fall through in a switch statement (for use with -Wimplicit-fallthrough).
+#define _fallthrough_ __attribute__((fallthrough))

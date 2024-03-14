@@ -73,6 +73,8 @@ mmu_read(MMU *mmu, uint16_t addr)
         return 0;
     case 0xFF80 ... 0xFFFE: // HRAM
         return mmu->hram[addr - 0xFF80];
+    case 0xFF00: // Joypad
+        return (mmu->input & 0xF0) | 0x0F;
     case 0xFFFF: // Interrupt Enable
         return mmu->IE;
     default:
@@ -121,6 +123,9 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
     case 0xFF80 ... 0xFFFE: // HRAM
         mmu->hram[addr - 0xFF80] = data;
         return;
+    case 0xFF00: // Joypad
+        mmu->input = data & 0xF0;
+        return;
     case 0xFFFF: // Interrupt Enable
         mmu->IE = data & 0x1F;
         return;
@@ -160,6 +165,7 @@ mmu_dma_tick(MMU *mmu)
 {
     if (mmu->dma_cycles > 0) {
         mmu->dma_cycles--;
+
         if (mmu->dma_cycles == 0) {
             mmu_dma(mmu, mmu->dma_page);
         }

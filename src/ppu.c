@@ -64,7 +64,6 @@ struct PPU {
     uint8_t WY;
     uint8_t WX;
 
-    bool frame_complete;
     bool vblank_interrupt;
     bool stat_interrupt;
     int line_ticks;
@@ -213,15 +212,15 @@ ppu_clear_frame(PPU *ppu, RGB color)
 static inline uint16_t
 ppu_tile_addr(PPU *ppu, uint8_t tile_id)
 {
-    if (ppu->LCDC.bg_tiledata == 0) {
-        return 0x8000 + tile_id*16;
+    if (ppu->LCDC.bg_tiledata) {
+        return 0x8000 + tile_id * 16;
     }
 
-    return 0x8800 + (int8_t)tile_id * 16;
+    return 0x9000 + (int8_t) tile_id * 16;
 }
 
 static void
-ppu_fetch_tile(PPU *ppu, int tile_y, int tile_x, uint8_t pixels[8][8])
+ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixels[8])
 {
     uint16_t tile_map = ppu->LCDC.bg_tilemap ? 0x9C00 : 0x9800;
     uint16_t tile_map_addr = tile_map + tile_y*32 + tile_x;
@@ -229,46 +228,38 @@ ppu_fetch_tile(PPU *ppu, int tile_y, int tile_x, uint8_t pixels[8][8])
     uint8_t tile_id = ppu_read_vram(ppu, tile_map_addr);
     uint16_t tile_addr = ppu_tile_addr(ppu, tile_id);
 
-    for (int y = 0; y < 8; y++) {
-        uint8_t b0 = ppu_read_vram(ppu, tile_addr + y*2 + 0);
-        uint8_t b1 = ppu_read_vram(ppu, tile_addr + y*2 + 1);
+    uint8_t b0 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 0);
+    uint8_t b1 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 1);
 
-        for (int x = 0; x < 8; x++) {
-            uint8_t v0 = ((b0 >> x) & 0x1) << 1;
-            uint8_t v1 = ((b1 >> x) & 0x1) << 0;
-            pixels[y][7-x] = v0 | v1;
-        }
+    for (int x = 0; x < 8; x++) {
+        uint8_t v0 = ((b0 >> x) & 0x1) << 1;
+        uint8_t v1 = ((b1 >> x) & 0x1) << 0;
+        pixels[7-x] = v0 | v1;
     }
 }
 
 static void
 ppu_render_scanline(PPU *ppu)
 {
-    if (true) {
+    if (ppu->LCDC.bg_enable) {
         uint8_t screen_y = ppu->LY;
 
-        int tile_y = screen_y / 8;
-        int pixel_y = screen_y % 8;
+        int tile_y = ((ppu->LY + ppu->SCY) / 8) % 32;
+        int pixel_y = (ppu->LY + ppu->SCY) % 8;
 
-        // int tile_y = (ppu->LY + ppu->SCY) / 8;
-        // int pixel_y = (ppu->LY + ppu->SCY) % 8;
-
-        uint8_t tile[8][8];
+        uint8_t tile_line[8];
         int last_tile_x = -1;
 
         for (int screen_x = 0; screen_x < 160; screen_x++) {
-            // int tile_x = (ppu->SCX + screen_x) / 8;
-            // int pixel_x = (ppu->SCX + screen_x) % 8;
-
-            int tile_x = screen_x / 8;
-            int pixel_x = screen_x % 8;
+            int tile_x = ((ppu->SCX + screen_x) / 8) % 32;
+            int pixel_x = (ppu->SCX + screen_x) % 8;
 
             if (tile_x != last_tile_x) {
-                ppu_fetch_tile(ppu, tile_y, tile_x, tile);
+                ppu_fetch_tile_line(ppu, tile_y, tile_x, pixel_y, tile_line);
                 last_tile_x = tile_x;
             }
 
-            uint8_t color_id = tile[pixel_y][pixel_x];
+            uint8_t color_id = tile_line[pixel_x];
             uint8_t color = (ppu->BGP >> (color_id * 2)) & 0x3;
 
             ppu->frame[screen_y][screen_x] = ppu_colors[color];
@@ -287,13 +278,14 @@ ppu_set_mode(PPU *ppu, enum PPUMode mode)
         break;
     case PPU_MODE_VBLANK:
         if (ppu->STAT.vblank_int) {
-            ppu->vblank_interrupt = true;
+            ppu->stat_interrupt = true;
         }
         break;
     case PPU_MODE_HBLANK:
         if (ppu->STAT.hblank_int) {
             ppu->stat_interrupt = true;
         }
+        break;
     default:
         break;
     }
@@ -341,8 +333,8 @@ ppu_step_hblank(PPU *ppu)
         ppu->line_ticks = 0;
 
         if (ppu->LY == 144) {
+            ppu->vblank_interrupt = true;
             ppu_set_mode(ppu, PPU_MODE_VBLANK);
-            ppu->frame_complete = true;
         } else {
             ppu_set_mode(ppu, PPU_MODE_OAM_SCAN);
         }
@@ -397,17 +389,6 @@ inline const uint8_t *
 ppu_get_vram(PPU *ppu)
 {
     return ppu->vram;
-}
-
-inline bool
-ppu_frame_complete(PPU *ppu)
-{
-    if (ppu->frame_complete) {
-        ppu->frame_complete = false;
-        return true;
-    }
-
-    return false;
 }
 
 inline bool

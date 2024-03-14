@@ -6,6 +6,7 @@
 #include "ppu.h"
 
 #define UI_SCALE 3
+#define UI_SHOW_FPS 0
 #define UI_WINDOW_HEIGHT (144 * UI_SCALE)
 #define UI_WINDOW_WIDTH ((160 * UI_SCALE) + (128 * 2))
 

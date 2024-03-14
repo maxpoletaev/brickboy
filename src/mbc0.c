@@ -19,16 +19,16 @@ IMapper *
 mbc0_create(ROM *rom)
 {
     MBC0 *impl = xalloc(sizeof(MBC0));
-    impl->mapper = mbc0_mapper;
+    impl->imapper = mbc0_mapper;
     impl->rom = rom;
 
-    return &impl->mapper;
+    return &impl->imapper;
 }
 
 void
 mbc0_free(IMapper *mapper)
 {
-    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
+    MBC0 *impl = CONTAINER_OF(mapper, MBC0, imapper);
     xfree(impl);
 }
 
@@ -41,11 +41,13 @@ mbc0_reset(IMapper *mapper)
 uint8_t
 mbc0_read(IMapper *mapper, uint16_t addr)
 {
-    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
+    MBC0 *impl = CONTAINER_OF(mapper, MBC0, imapper);
 
+#ifndef NDEBUG
     if (addr >= impl->rom->size) {
         PANIC("out of bounds read at 0x%04X", addr);
     }
+#endif
 
     return impl->rom->data[addr];
 }
@@ -53,11 +55,7 @@ mbc0_read(IMapper *mapper, uint16_t addr)
 void
 mbc0_write(IMapper *mapper, uint16_t addr, uint8_t data)
 {
-    MBC0 *impl = CONTAINER_OF(mapper, MBC0, mapper);
-
-    if (addr >= impl->rom->size) {
-        PANIC("out of bounds write at 0x%04X", addr);
-    }
-
-    impl->rom->data[addr] = data;
+    UNUSED(mapper);
+    UNUSED(data);
+    TRACE("write to read-only memory at 0x%04X", addr);
 }

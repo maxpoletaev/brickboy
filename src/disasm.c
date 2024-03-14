@@ -179,4 +179,8 @@ disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf)
     // CPU registers: A:00 B:00 C:00 D:00 E:00 H:00 L:00 SP:0000
     strbuf_addf(buf, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
                 cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP);
+
+
+    // Interrupts: IE:00 IF:00
+    strbuf_addf(buf, "  IE:%02X IF:%02X", mmu->IE, mmu->IF);
 }

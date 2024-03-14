@@ -31,8 +31,6 @@ const RGB *ppu_get_frame(PPU *ppu);
 
 const uint8_t *ppu_get_vram(PPU *ppu);
 
-bool ppu_frame_complete(PPU *ppu);
-
 bool ppu_stat_interrupt(PPU *ppu);
 
 bool ppu_vblank_interrupt(PPU *ppu);

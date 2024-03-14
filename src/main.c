@@ -133,7 +133,7 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
                     fputc('\n', debug_out);
                 }
 
-                serial_print(mmu->serial);
+                // serial_print(mmu->serial);
             }
 
             // CPU is clocked at 1/4 of the master clock.
@@ -149,6 +149,14 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
         // VBLANK interrupt requested
         if (ppu_vblank_interrupt(mmu->ppu)) {
             mmu->IF |= INT_VBLANK;
+
+            ui_update_debug_view(ppu_get_vram(mmu->ppu));
+            ui_update_frame_view(ppu_get_frame(mmu->ppu));
+            ui_refresh();
+
+            if (ui_should_close()) {
+                break;
+            }
         }
 
         // LCD STAT interrupt requested
@@ -159,16 +167,6 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
         // Timer interrupt requested
         if (timer_interrupt(mmu->timer)) {
             mmu->IF |= INT_TIMER;
-        }
-
-        if (ppu_frame_complete(mmu->ppu)) {
-            if (ui_should_close()) {
-                break;
-            }
-
-            ui_update_debug_view(ppu_get_vram(mmu->ppu));
-            ui_update_frame_view(ppu_get_frame(mmu->ppu));
-            ui_refresh();
         }
 
         ticks++;
@@ -184,8 +182,8 @@ get_mapper(ROM *rom)
     case ROM_TYPE_ROM_ONLY:
         return mbc0_create(rom);
     default:
-        LOG("unknown mapper: %02X, fallback to MBC0", rom->header->type);
-        return mbc0_create(rom);
+        LOG("unknown mapper: %02X", rom->header->type);
+        return NULL;
     }
 }
 
@@ -227,6 +225,12 @@ main(int argc, char **argv)
         exit(1);
     }
 
+    IMapper *mapper _cleanup_(mapper_free) = get_mapper(rom);
+    if (mapper == NULL) {
+        LOG("failed to load rom: %s", opts.romfile);
+        exit(1);
+    }
+
     CPU *cpu _cleanup_(cpu_free) = cpu_new();
 
     PPU *ppu _cleanup_(ppu_free) = ppu_new();
@@ -236,8 +240,6 @@ main(int argc, char **argv)
     Serial *serial _cleanup_(serial_free) = serial_new();
 
     Strbuf *disasm_buf _cleanup_(strbuf_free) = strbuf_new(1024);
-
-    IMapper *mapper _cleanup_(mapper_free) = get_mapper(rom);
 
     MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu);
 

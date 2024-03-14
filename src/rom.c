@@ -69,14 +69,16 @@ rom_open(const char *filename)
     return rom;
 
 failure:
-    xfree(rom);
+    rom_free(&rom);
     return NULL;
 }
 
 void
 rom_free(ROM **rom)
 {
-    (*rom)->header = NULL;
-    xfree((*rom)->data);
-    xfree(*rom);
+    if (*rom != NULL) {
+        (*rom)->header = NULL;
+        xfree((*rom)->data);
+        xfree(*rom);
+    }
 }

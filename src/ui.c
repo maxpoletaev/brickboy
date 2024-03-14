@@ -17,6 +17,7 @@ void
 ui_init(void)
 {
     SetTargetFPS(60);
+    SetTraceLogLevel(LOG_ERROR);
     InitWindow(UI_WINDOW_WIDTH, UI_WINDOW_HEIGHT, "BrickBoy");
 
     ui.frame_texture = LoadRenderTexture(160, 144);

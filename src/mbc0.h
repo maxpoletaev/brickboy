@@ -6,7 +6,7 @@
 #include "mapper.h"
 
 typedef struct {
-    IMapper mapper;
+    IMapper imapper;
     ROM *rom;
 } MBC0;
 

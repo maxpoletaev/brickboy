@@ -16,10 +16,10 @@ make
 ## Status
 
  * [x] CPU
- * [ ] Timer
- * [ ] Background
+ * [x] Timer
+ * [x] Background
  * [ ] Window
- * [ ] DMA
+ * [x] DMA
  * [ ] Sprites
  * [ ] Scrolling
  * [ ] Sound
@@ -30,7 +30,7 @@ make
 ## CPU tests (Blargg's)
 
  - [x] 01-special
- - [ ] 02-interrupts
+ - [x] 02-interrupts
  - [x] 03-op sp,hl
  - [x] 04-op r,imm
  - [x] 05-op rp
@@ -49,5 +49,4 @@ make
 - [Gameboy Logs](https://github.com/wheremyfoodat/Gameboy-logs) by wheremyfoodat
 - [Test ROMs](https://github.com/retrio/gb-test-roms) (mirror of Blargg’s tests)
 - [The Gameboy Emulator Development Guide](https://hacktix.github.io/GBEDG/)
-- [Gameboy Emulation in JavaScript](https://imrannazar.com/series/gameboy-emulation-in-javascript)
 - [Lazy Gameboy Emulator](https://cturt.github.io/cinoop.html)
