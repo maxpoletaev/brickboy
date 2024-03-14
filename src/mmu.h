@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "joypad.h"
 #include "rom.h"
 #include "timer.h"
 #include "mapper.h"
@@ -20,14 +21,14 @@ typedef struct MMU {
     PPU *ppu;             // PPU (0xFF40 - 0xFF4B) + VRAM (0x8000 - 0x9FFF) + OAM (0xFE00 - 0xFE9F)
     uint8_t IF;           // Interrupt Flags (0xFF0F)
     uint8_t IE;           // Interrupt Enable (0xFFFF)
-    uint8_t input;        // Input (0xFF00)
+    Joypad *joypad;       // Joypad (0xFF00)
 
     bool bootrom_mapped;
     uint8_t dma_cycles;
     uint8_t dma_page;
 } MMU;
 
-MMU *mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu);
+MMU *mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu, Joypad *joypad);
 
 void mmu_free(MMU **mmu);
 

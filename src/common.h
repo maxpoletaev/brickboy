@@ -18,6 +18,12 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define SETBIT(x, n) ((x) |= (1 << (n)))
+
+#define CLRBIT(x, n) ((x) &= ~(1 << (n)))
+
+#define GETBIT(x, n) (((x) >> (n)) & 1)
+
 #define PANIC(fmt, ...) \
     do { \
         fprintf(stderr, "panic: " fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__); \

@@ -7,11 +7,13 @@
 #include "mmu.h"
 #include "serial.h"
 #include "ppu.h"
+#include "joypad.h"
 
 MMU *
-mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu)
+mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu, Joypad *joypad)
 {
     MMU *mmu = xalloc(sizeof(MMU));
+    mmu->joypad = joypad;
     mmu->mapper = mapper;
     mmu->serial = serial;
     mmu->timer = timer;
@@ -32,6 +34,7 @@ mmu_reset(MMU *mmu)
     timer_reset(mmu->timer);
     serial_reset(mmu->serial);
     mapper_reset(mmu->mapper);
+    joypad_reset(mmu->joypad);
 
     memset(mmu->ram, 0x00, sizeof(mmu->ram));
     memset(mmu->hram, 0xFF, sizeof(mmu->hram));
@@ -74,7 +77,7 @@ mmu_read(MMU *mmu, uint16_t addr)
     case 0xFF80 ... 0xFFFE: // HRAM
         return mmu->hram[addr - 0xFF80];
     case 0xFF00: // Joypad
-        return (mmu->input & 0xF0) | 0x0F;
+        return joypad_read(mmu->joypad);
     case 0xFFFF: // Interrupt Enable
         return mmu->IE;
     default:
@@ -124,7 +127,7 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
         mmu->hram[addr - 0xFF80] = data;
         return;
     case 0xFF00: // Joypad
-        mmu->input = data & 0xF0;
+        joypad_write(mmu->joypad, data);
         return;
     case 0xFFFF: // Interrupt Enable
         mmu->IE = data & 0x1F;

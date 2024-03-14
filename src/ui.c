@@ -5,6 +5,7 @@
 #include "raylib.h"
 #include "ppu.h"
 #include "ui.h"
+#include "joypad.h"
 
 static struct {
     Color frame_pixels[144*160];
@@ -125,7 +126,53 @@ ui_refresh(void)
     EndDrawing();
 }
 
+static inline bool
+ui_modifier_pressed(void)
+{
+    return IsKeyDown(KEY_LEFT_CONTROL) ||
+        IsKeyDown(KEY_RIGHT_CONTROL) ||
+        IsKeyDown(KEY_LEFT_SUPER) ||
+        IsKeyDown(KEY_RIGHT_SUPER);
+}
+
 bool
+ui_reset_pressed(void)
+{
+    return ui_modifier_pressed() && IsKeyPressed(KEY_R);
+}
+
+bool
+ui_key_pressed(JoypadButton button)
+{
+    switch (button) {
+    case JOYPAD_UP:
+        return IsKeyDown(KEY_W);
+    case JOYPAD_LEFT:
+        return IsKeyDown(KEY_A);
+    case JOYPAD_DOWN:
+        return IsKeyDown(KEY_S);
+    case JOYPAD_RIGHT:
+        return IsKeyDown(KEY_D);
+    case JOYPAD_A:
+        return IsKeyDown(KEY_K);
+    case JOYPAD_B:
+        return IsKeyDown(KEY_J);
+    case JOYPAD_SELECT:
+        return IsKeyDown(KEY_RIGHT_SHIFT);
+    case JOYPAD_START:
+        return IsKeyDown(KEY_ENTER);
+    default:
+        PANIC("invalid button: %d", button);
+    }
+}
+
+inline bool
+ui_should_pause(void)
+{
+    return !IsWindowFocused();
+}
+
+inline bool
 ui_should_close(void)
 {
     return WindowShouldClose();

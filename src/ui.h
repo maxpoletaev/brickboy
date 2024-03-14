@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "raylib.h"
+#include "joypad.h"
 #include "ppu.h"
 
 #define UI_SCALE 3
@@ -16,7 +17,13 @@ void ui_update_frame_view(const RGB *frame);
 
 void ui_update_debug_view(const uint8_t *vram);
 
+bool ui_key_pressed(JoypadButton button);
+
+bool ui_reset_pressed(void);
+
 void ui_refresh(void);
+
+bool ui_should_pause(void);
 
 bool ui_should_close(void);
 

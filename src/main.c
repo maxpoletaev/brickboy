@@ -20,6 +20,7 @@
 #include "ppu.h"
 #include "ui.h"
 #include "mbc0.h"
+#include "joypad.h"
 
 static void
 bitfield_test(void)
@@ -88,7 +89,7 @@ print_state(CPU *cpu, MMU *bus, FILE *out)
 }
 
 static inline bool
-handle_interrupts(CPU *cpu, MMU *mmu)
+gb_handle_interrupts(CPU *cpu, MMU *mmu)
 {
     static const uint8_t mask[] =  {INT_VBLANK, INT_LCD_STAT, INT_TIMER, INT_SERIAL, INT_JOYPAD};
     static const uint16_t addr[] = {0x0040, 0x0048, 0x0050, 0x0058, 0x0060};
@@ -112,8 +113,27 @@ handle_interrupts(CPU *cpu, MMU *mmu)
     return false;
 }
 
+static inline void
+gb_handle_input(MMU *mmu)
+{
+    static const JoypadButton buttons[] = {
+        JOYPAD_RIGHT, JOYPAD_LEFT, JOYPAD_UP, JOYPAD_DOWN,
+        JOYPAD_A, JOYPAD_B, JOYPAD_SELECT, JOYPAD_START,
+    };
+
+    joypad_clear(mmu->joypad);
+    mmu->IF &= ~INT_JOYPAD;
+
+    for (size_t i = 0; i < ARRAY_SIZE(buttons); i++) {
+        if (ui_key_pressed(buttons[i])) {
+            joypad_press(mmu->joypad, buttons[i]);
+            mmu->IF |= INT_JOYPAD;
+        }
+    }
+}
+
 static void
-game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_out)
+gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_out)
 {
     ui_init();
 
@@ -137,7 +157,7 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
             }
 
             // CPU is clocked at 1/4 of the master clock.
-            handle_interrupts(cpu, mmu);
+            gb_handle_interrupts(cpu, mmu);
             cpu_step(cpu, mmu);
         }
 
@@ -154,9 +174,17 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
             ui_update_frame_view(ppu_get_frame(mmu->ppu));
             ui_refresh();
 
+            if (ui_reset_pressed()) {
+                LOG("RESET pressed");
+                cpu_reset(cpu);
+                mmu_reset(mmu);
+            }
+
             if (ui_should_close()) {
                 break;
             }
+
+            gb_handle_input(mmu);
         }
 
         // LCD STAT interrupt requested
@@ -176,7 +204,7 @@ game_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_o
 }
 
 static IMapper *
-get_mapper(ROM *rom)
+gb_get_mapper(ROM *rom)
 {
     switch (rom->header->type) {
     case ROM_TYPE_ROM_ONLY:
@@ -225,7 +253,7 @@ main(int argc, char **argv)
         exit(1);
     }
 
-    IMapper *mapper _cleanup_(mapper_free) = get_mapper(rom);
+    IMapper *mapper _cleanup_(mapper_free) = gb_get_mapper(rom);
     if (mapper == NULL) {
         LOG("failed to load rom: %s", opts.romfile);
         exit(1);
@@ -241,9 +269,11 @@ main(int argc, char **argv)
 
     Strbuf *disasm_buf _cleanup_(strbuf_free) = strbuf_new(1024);
 
-    MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu);
+    Joypad *joypad _cleanup_(joypad_free) = joypad_new();
 
-    game_loop(cpu, mmu, disasm_buf, debug_out, state_out);
+    MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu, joypad);
+
+    gb_run_loop(cpu, mmu, disasm_buf, debug_out, state_out);
 
     return 0;
 }
