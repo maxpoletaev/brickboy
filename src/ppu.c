@@ -6,20 +6,20 @@
 #include "common.h"
 
 const RGB ppu_colors[4] = {
-    {255, 255, 255},
-    {192, 192, 192},
-    {96, 96, 96},
-    {0, 0, 0},
+    {181, 198, 156},
+    {141, 156, 123},
+    {99, 114, 81},
+    {48, 56, 32},
 };
 
-enum PPUMode {
+typedef enum {
     PPU_MODE_HBLANK = 0,
     PPU_MODE_VBLANK = 1,
     PPU_MODE_OAM_SCAN = 2,
     PPU_MODE_PIXEL_DRAW = 3
-};
+} PPUMode;
 
-union LCDCRegister {
+typedef union {
     uint8_t raw;
     struct {
         uint8_t bg_enable : 1;
@@ -31,9 +31,9 @@ union LCDCRegister {
         uint8_t win_tilemap : 1;
         uint8_t lcd_enable : 1;
     } _packed_;
-};
+} LCDCRegister;
 
-union StatRegister {
+typedef union {
     uint8_t raw;
     struct {
         uint8_t mode : 2;
@@ -44,15 +44,32 @@ union StatRegister {
         uint8_t lyc_int : 1;
         uint8_t _unused_ : 1;
     } _packed_;
-};
+} StatRegister;
+
+typedef struct {
+    uint8_t y;
+    uint8_t x;
+    uint8_t tile_id;
+
+    union {
+        uint8_t flags;
+        struct {
+            uint8_t _unused_ : 4;
+            uint8_t palette : 1;
+            uint8_t yflip : 1;
+            uint8_t xflip : 1;
+            uint8_t priority : 1;
+        } _packed_;
+    };
+} Sprite;
 
 struct PPU {
     RGB frame[144][160];
     uint8_t vram[0x2000];
     uint8_t oam[0xA0];
 
-    union LCDCRegister LCDC;
-    union StatRegister STAT;
+    LCDCRegister LCDC;
+    StatRegister STAT;
     uint8_t SCY;
     uint8_t SCX;
     uint8_t LY;
@@ -232,9 +249,93 @@ ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixel
     uint8_t b1 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 1);
 
     for (int x = 0; x < 8; x++) {
-        uint8_t v0 = ((b0 >> x) & 0x1) << 1;
-        uint8_t v1 = ((b1 >> x) & 0x1) << 0;
-        pixels[7-x] = v0 | v1;
+        uint8_t px = ((b0 >> x) & 0x1) << 1;
+        px |= ((b1 >> x) & 0x1) << 0;
+        pixels[7-x] = px;
+    }
+}
+
+static inline void
+ppu_render_tiles(PPU *ppu)
+{
+    uint8_t screen_y = ppu->LY;
+
+    int tile_y = ((ppu->LY + ppu->SCY) / 8) % 32;
+    int pixel_y = (ppu->LY + ppu->SCY) % 8;
+
+    uint8_t tile_line[8];
+    int last_tile_x = -1;
+
+    for (int screen_x = 0; screen_x < 160; screen_x++) {
+        int tile_x = ((ppu->SCX + screen_x) / 8) % 32;
+        int pixel_x = (ppu->SCX + screen_x) % 8;
+
+        if (tile_x != last_tile_x) {
+            ppu_fetch_tile_line(ppu, tile_y, tile_x, pixel_y, tile_line);
+            last_tile_x = tile_x;
+        }
+
+        uint8_t color_id = tile_line[pixel_x];
+        uint8_t color = (ppu->BGP >> (color_id * 2)) & 0x3;
+
+        ppu->frame[screen_y][screen_x] = ppu_colors[color];
+    }
+}
+
+static inline Sprite
+ppu_fetch_sprite(PPU *ppu, int sprite_id)
+{
+    Sprite sprite;
+    sprite.y = ppu->oam[sprite_id*4 + 0];
+    sprite.x = ppu->oam[sprite_id*4 + 1];
+    sprite.tile_id = ppu->oam[sprite_id*4 + 2];
+    sprite.flags = ppu->oam[sprite_id*4 + 3];
+    return sprite;
+}
+
+static inline void
+ppu_render_sprites(PPU *ppu)
+{
+    for (int i = 0; i < 40; i++) {
+        Sprite sprite = ppu_fetch_sprite(ppu, i);
+
+        if ((sprite.y == 0 || sprite.y >= 160) ||
+            (sprite.x == 0 || sprite.x >= 168)) {
+            continue;
+        }
+
+        uint8_t y = ppu->LY - sprite.y;
+        uint8_t palette = sprite.palette ? ppu->OBP1 : ppu->OBP0;
+
+        if (ppu->LCDC.obj_size) {
+            // 8x16 sprite
+        } else {
+            if (sprite.y > ppu->LY || sprite.y+8 <= ppu->LY) {
+                continue;
+            }
+
+            uint8_t screen_y = ppu->LY - 16;
+            uint8_t yflip = sprite.yflip ? 7-y : y;
+            uint16_t tile_addr = 0x8000 + sprite.tile_id * 16;
+            uint8_t d0 = ppu_read_vram(ppu, tile_addr + yflip*2 + 0);
+            uint8_t d1 = ppu_read_vram(ppu, tile_addr + yflip*2 + 1);
+
+            for (int x = 0; x < 8; x++) {
+                uint8_t screen_x = sprite.x - 8;
+                uint8_t xflip = sprite.xflip ? x : 7-x;
+
+                uint8_t c0 = ((d0 >> x) & 0x1) << 1;
+                uint8_t c1 = ((d1 >> x) & 0x1) << 0;
+                uint8_t color_id = c0 | c1;
+
+                if (color_id == 0) {
+                    continue;
+                }
+
+                uint8_t color = (palette >> (color_id * 2)) & 0x3;
+                ppu->frame[screen_y][screen_x + xflip] = ppu_colors[color];
+            }
+        }
     }
 }
 
@@ -242,33 +343,16 @@ static void
 ppu_render_scanline(PPU *ppu)
 {
     if (ppu->LCDC.bg_enable) {
-        uint8_t screen_y = ppu->LY;
+        ppu_render_tiles(ppu);
+    }
 
-        int tile_y = ((ppu->LY + ppu->SCY) / 8) % 32;
-        int pixel_y = (ppu->LY + ppu->SCY) % 8;
-
-        uint8_t tile_line[8];
-        int last_tile_x = -1;
-
-        for (int screen_x = 0; screen_x < 160; screen_x++) {
-            int tile_x = ((ppu->SCX + screen_x) / 8) % 32;
-            int pixel_x = (ppu->SCX + screen_x) % 8;
-
-            if (tile_x != last_tile_x) {
-                ppu_fetch_tile_line(ppu, tile_y, tile_x, pixel_y, tile_line);
-                last_tile_x = tile_x;
-            }
-
-            uint8_t color_id = tile_line[pixel_x];
-            uint8_t color = (ppu->BGP >> (color_id * 2)) & 0x3;
-
-            ppu->frame[screen_y][screen_x] = ppu_colors[color];
-        }
+    if (ppu->LCDC.obj_enable) {
+        ppu_render_sprites(ppu);
     }
 }
 
 static inline void
-ppu_set_mode(PPU *ppu, enum PPUMode mode)
+ppu_set_mode(PPU *ppu, PPUMode mode)
 {
     switch (mode) {
     case PPU_MODE_OAM_SCAN:

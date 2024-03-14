@@ -20,7 +20,8 @@ make
  * [x] Background
  * [ ] Window
  * [x] DMA
- * [ ] Sprites
+ * [x] Sprites 8x8
+ * [ ] Sprites 8x16
  * [ ] Scrolling
  * [ ] Sound
  * [ ] Input
