@@ -24,7 +24,7 @@ make
  * [ ] Sprites 8x16
  * [ ] Scrolling
  * [ ] Sound
- * [ ] Input
+ * [x] Input
  * [ ] Mappers
  * [ ] Save states
 
@@ -41,6 +41,14 @@ make
  - [x] 09-op r,r
  - [x] 10-bit ops
  - [x] 11-op a,(hl)
+
+
+## Tested Games
+
+| Game | Status | Notes |
+|------|--------|-------|
+| Tetris | Playable ||
+| Dr. Mario | Playable ||
 
 ## Resources
 
