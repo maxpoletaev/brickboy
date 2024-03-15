@@ -29,7 +29,9 @@ mapper_reset(IMapper *mapper)
 inline void
 mapper_free(IMapper **mapper)
 {
-    assert((*mapper)->free != NULL);
-    (*mapper)->free(*mapper);
-    *mapper = NULL;
+    if (*mapper != NULL) {
+        assert((*mapper)->free != NULL);
+        (*mapper)->free(*mapper);
+        *mapper = NULL;
+    }
 }

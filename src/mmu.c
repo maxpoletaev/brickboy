@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -8,6 +9,7 @@
 #include "serial.h"
 #include "ppu.h"
 #include "joypad.h"
+#include "interrupt.h"
 
 MMU *
 mmu_new(IMapper *mapper, Serial *serial, Timer *timer, PPU *ppu, Joypad *joypad)
@@ -155,7 +157,7 @@ mmu_write16(MMU *mmu, uint16_t addr, uint16_t data)
 }
 
 static void
-mmu_dma(MMU *mmu, uint16_t page)
+mmu_dma_copy(MMU *mmu, uint16_t page)
 {
     uint16_t addr = page << 8;
     for (int i = 0; i < 0xA0; i++) {
@@ -164,13 +166,37 @@ mmu_dma(MMU *mmu, uint16_t page)
 }
 
 void
-mmu_dma_tick(MMU *mmu)
+mmu_dma_step(MMU *mmu)
 {
     if (mmu->dma_cycles > 0) {
         mmu->dma_cycles--;
 
         if (mmu->dma_cycles == 0) {
-            mmu_dma(mmu, mmu->dma_page);
+            mmu_dma_copy(mmu, mmu->dma_page);
         }
     }
+}
+
+inline bool
+mmu_interrupt_enabled(MMU *mmu, Interrupt interrupt)
+{
+    return mmu->IE & interrupt;
+}
+
+inline bool
+mmu_interrupt_requested(MMU *mmu, Interrupt interrupt)
+{
+    return mmu->IF & interrupt;
+}
+
+inline void
+mmu_set_interrupt(MMU *mmu, Interrupt interrupt)
+{
+    mmu->IF |= interrupt;
+}
+
+inline void
+mmu_clear_interrupt(MMU *mmu, Interrupt interrupt)
+{
+    mmu->IF &= ~interrupt;
 }

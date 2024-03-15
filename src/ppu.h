@@ -5,14 +5,6 @@
 
 #include "common.h"
 
-typedef struct RGB {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-} RGB;
-
-extern const RGB ppu_colors[4];
-
 typedef struct PPU PPU;
 
 PPU *ppu_new(void);
@@ -27,7 +19,7 @@ uint8_t ppu_read(PPU *ppu, uint16_t addr);
 
 void ppu_step(PPU *ppu);
 
-const RGB *ppu_get_frame(PPU *ppu);
+const uint8_t *ppu_get_frame(PPU *ppu);
 
 const uint8_t *ppu_get_vram(PPU *ppu);
 

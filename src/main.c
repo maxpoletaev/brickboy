@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 
 #include "opts.h"
 #include "common.h"
@@ -21,6 +20,7 @@
 #include "ui.h"
 #include "mbc0.h"
 #include "joypad.h"
+#include "interrupt.h"
 
 static void
 bitfield_test(void)
@@ -73,7 +73,7 @@ output_file(const char *filename)
 }
 
 static inline void
-print_state(CPU *cpu, MMU *bus, FILE *out)
+gb_print_state(CPU *cpu, MMU *bus, FILE *out)
 {
     fprintf(out, "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X",
             cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP, cpu->PC);
@@ -91,21 +91,24 @@ print_state(CPU *cpu, MMU *bus, FILE *out)
 static inline bool
 gb_handle_interrupts(CPU *cpu, MMU *mmu)
 {
-    static const uint8_t mask[] =  {INT_VBLANK, INT_LCD_STAT, INT_TIMER, INT_SERIAL, INT_JOYPAD};
-    static const uint16_t addr[] = {0x0040, 0x0048, 0x0050, 0x0058, 0x0060};
-    static_assert(ARRAY_SIZE(mask) == ARRAY_SIZE(addr), "");
+    static const uint8_t ints[] =  {INT_VBLANK, INT_LCD_STAT, INT_TIMER, INT_SERIAL, INT_JOYPAD};
+    static const uint16_t addrs[] = {0x0040, 0x0048, 0x0050, 0x0058, 0x0060};
+    static_assert(ARRAY_SIZE(ints) == ARRAY_SIZE(addrs), "");
 
     if (mmu->IF == 0 || mmu->IE == 0) {
         return false;
     }
 
-    for (size_t i = 0; i < ARRAY_SIZE(mask); i++) {
-        if ((mmu->IF & mask[i]) && (mmu->IE & mask[i])) {
-            if (!cpu_interrupt(cpu, mmu, addr[i])) {
+    for (size_t i = 0; i < ARRAY_SIZE(ints); i++) {
+        bool requested = mmu_interrupt_requested(mmu, ints[i]);
+        bool enabled = mmu_interrupt_enabled(mmu, ints[i]);
+
+        if (requested && enabled) {
+            if (!cpu_interrupt(cpu, mmu, addrs[i])) {
                 return false;
             }
 
-            mmu->IF &= ~mask[i];
+            mmu_clear_interrupt(mmu, ints[i]);
             return true;
         }
     }
@@ -121,13 +124,13 @@ gb_handle_input(MMU *mmu)
         JOYPAD_A, JOYPAD_B, JOYPAD_SELECT, JOYPAD_START,
     };
 
+    mmu_clear_interrupt(mmu, INT_JOYPAD);
     joypad_clear(mmu->joypad);
-    mmu->IF &= ~INT_JOYPAD;
 
     for (size_t i = 0; i < ARRAY_SIZE(buttons); i++) {
-        if (ui_key_pressed(buttons[i])) {
+        if (ui_button_pressed(buttons[i])) {
             joypad_press(mmu->joypad, buttons[i]);
-            mmu->IF |= INT_JOYPAD;
+            mmu_set_interrupt(mmu, INT_JOYPAD);
         }
     }
 }
@@ -143,7 +146,7 @@ gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state
         if (ticks%4 == 0) {
             if (cpu->step == 0 && !cpu->halted) {
                 if (state_out != NULL) {
-                    print_state(cpu, mmu, state_out);
+                    gb_print_state(cpu, mmu, state_out);
                 }
 
                 if (debug_out != NULL) {
@@ -164,11 +167,11 @@ gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state
         // PPU and timer run at the master clock.
         timer_step(mmu->timer);
         ppu_step(mmu->ppu);
-        mmu_dma_tick(mmu);
+        mmu_dma_step(mmu);
 
         // VBLANK interrupt requested
         if (ppu_vblank_interrupt(mmu->ppu)) {
-            mmu->IF |= INT_VBLANK;
+            mmu_set_interrupt(mmu, INT_VBLANK);
 
             ui_update_debug_view(ppu_get_vram(mmu->ppu));
             ui_update_frame_view(ppu_get_frame(mmu->ppu));
@@ -189,12 +192,12 @@ gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state
 
         // LCD STAT interrupt requested
         if (ppu_stat_interrupt(mmu->ppu)) {
-            mmu->IF |= INT_LCD_STAT;
+            mmu_set_interrupt(mmu, INT_LCD_STAT);
         }
 
         // Timer interrupt requested
         if (timer_interrupt(mmu->timer)) {
-            mmu->IF |= INT_TIMER;
+            mmu_set_interrupt(mmu, INT_TIMER);
         }
 
         ticks++;

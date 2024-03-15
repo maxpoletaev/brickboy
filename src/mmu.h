@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "joypad.h"
+#include "interrupt.h"
 #include "rom.h"
 #include "timer.h"
 #include "mapper.h"
@@ -42,4 +43,12 @@ uint16_t mmu_read16(MMU *mmu, uint16_t addr);
 
 void mmu_write16(MMU *mmu, uint16_t addr, uint16_t data);
 
-void mmu_dma_tick(MMU *mmu);
+void mmu_dma_step(MMU *mmu);
+
+bool mmu_interrupt_enabled(MMU *mmu, Interrupt interrupt);
+
+bool mmu_interrupt_requested(MMU *mmu, Interrupt interrupt);
+
+void mmu_set_interrupt(MMU *mmu, Interrupt interrupt);
+
+void mmu_clear_interrupt(MMU *mmu, Interrupt interrupt);

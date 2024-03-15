@@ -299,7 +299,7 @@ cpu_decode(MMU *bus, uint16_t pc)
 }
 
 bool
-cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc)
+cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr)
 {
     cpu->halted = false;
 
@@ -311,7 +311,7 @@ cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc)
 
     cpu_push(cpu, bus, cpu->PC);
 
-    cpu->PC = pc;
+    cpu->PC = addr;
 
     return true;
 }

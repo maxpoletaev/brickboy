@@ -13,6 +13,22 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
 
+## Running
+
+```bash
+./brickboy <rom.gb>
+```
+
+## Controls
+
+* `W` `A` `S` `D` - D-Pad
+* `Enter` - Start
+* `RShift` - Select
+* `J` - A
+* `K` - B
+* `1` `2` `3` - Color palettes
+* `Esc` - Quit
+
 ## Status
 
  * [x] CPU
@@ -26,6 +42,7 @@ make
  * [ ] Sound
  * [x] Input
  * [ ] Mappers
+ * [ ] Boot ROM
  * [ ] Save states
 
 ## CPU tests (Blargg's)

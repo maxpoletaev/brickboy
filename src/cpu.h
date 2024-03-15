@@ -2,16 +2,9 @@
 
 #include <stdint.h>
 
+#include "interrupt.h"
 #include "common.h"
 #include "mmu.h"
-
-typedef enum {
-    INT_VBLANK = (1 << 0),
-    INT_LCD_STAT = (1 << 1),
-    INT_TIMER = (1 << 2),
-    INT_SERIAL = (1 << 3),
-    INT_JOYPAD = (1 << 4),
-} Interrupt;
 
 typedef struct CPUFlags {
     uint8_t _unused_ : 4;
@@ -152,7 +145,7 @@ void cpu_reset(CPU *cpu);
 
 void cpu_step(CPU *cpu, MMU *bus);
 
-bool cpu_interrupt(CPU *cpu, MMU *bus, uint16_t pc);
+bool cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr);
 
 const Instruction *cpu_decode(MMU *bus, uint16_t pc);
 

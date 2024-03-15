@@ -3,15 +3,36 @@
 
 #include "common.h"
 #include "raylib.h"
-#include "ppu.h"
-#include "ui.h"
 #include "joypad.h"
+#include "ui.h"
+
+const Color ui_palettes[][4] = {
+    { // GREEN
+        {181, 198, 156, 255},
+        {141, 156, 123, 255},
+        {99, 114, 81, 255},
+        {48, 56, 32, 255},
+    },
+    { // ORANGE
+        {249, 234, 139, 255},
+        {229, 148, 54, 255},
+        {150, 66, 32, 255},
+        {45, 19, 9, 255},
+    },
+    { // PINK
+        {252, 200, 155, 255},
+        {255, 95, 162, 255},
+        {150, 55, 95, 255},
+        {60, 22, 38, 255},
+    },
+};
 
 static struct {
     Color frame_pixels[144*160];
     RenderTexture2D frame_texture;
     Color tileset_pixels[128*192];
     RenderTexture2D tileset_texture;
+    int palette;
 } ui;
 
 void
@@ -33,20 +54,15 @@ ui_close(void)
     CloseWindow();
 }
 
-static inline Color
-ui_to_color(RGB pixel)
-{
-    return (Color) {pixel.r, pixel.g, pixel.b, 255};
-}
-
 void
-ui_update_frame_view(const RGB *frame)
+ui_update_frame_view(const uint8_t *frame)
 {
     BeginTextureMode(ui.frame_texture);
 
     for (int y = 0; y < 144; y++) {
         for (int x = 0; x < 160; x++) {
-            ui.frame_pixels[y*160 + x] = ui_to_color(frame[y*160 + x]);
+            uint8_t pixel = frame[y*160 + x];
+            ui.frame_pixels[y*160 + x] = ui_palettes[ui.palette][pixel];
         }
     }
 
@@ -66,15 +82,15 @@ ui_draw_tile(const uint8_t *vram, int tile_num, int pos_x, int pos_y, Color *pix
         uint8_t b1 = vram[offset + 1];
 
         for (int x = 0; x < 8; x++) {
-            uint8_t v0 = ((b0 >> x) & 0x1) << 1;
-            uint8_t v1 = ((b1 >> x) & 0x1) << 0;
-            tile[y][7-x] = v0 | v1;
+            uint8_t px = ((b0 >> x) & 0x1) << 1;
+            px |= ((b1 >> x) & 0x1) << 0;
+            tile[y][7-x] = px;
         }
     }
 
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            Color color = ui_to_color(ppu_colors[tile[y][x]]);
+            Color color = ui_palettes[ui.palette][tile[y][x]];
             pixels[(pos_y + y) * 128 + (pos_x + x)] = color;
         }
     }
@@ -106,11 +122,26 @@ ui_draw_overlay(void)
     DrawText(strfmt("%d fps", fps), 2, 2, 10, WHITE);
 }
 
+static inline void
+ui_handle_hotkeys(void)
+{
+    if (IsKeyPressed(KEY_ONE)) {
+        ui.palette = 0;
+    } else if (IsKeyPressed(KEY_TWO)) {
+        ui.palette = 1;
+    } else if (IsKeyPressed(KEY_THREE)) {
+        ui.palette = 2;
+    }
+}
+
 void
 ui_refresh(void)
 {
+
     BeginDrawing();
     ClearBackground(PURPLE);
+
+    ui_handle_hotkeys();
 
     static Vector2 origin = (Vector2) {0, 0};
 
@@ -142,7 +173,7 @@ ui_reset_pressed(void)
 }
 
 bool
-ui_key_pressed(JoypadButton button)
+ui_button_pressed(JoypadButton button)
 {
     switch (button) {
     case JOYPAD_UP:

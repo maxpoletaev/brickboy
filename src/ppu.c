@@ -5,13 +5,6 @@
 #include "ppu.h"
 #include "common.h"
 
-const RGB ppu_colors[4] = {
-    {181, 198, 156},
-    {141, 156, 123},
-    {99, 114, 81},
-    {48, 56, 32},
-};
-
 typedef enum {
     PPU_MODE_HBLANK = 0,
     PPU_MODE_VBLANK = 1,
@@ -64,7 +57,7 @@ typedef struct {
 } Sprite;
 
 struct PPU {
-    RGB frame[144][160];
+    uint8_t frame[144][160];
     uint8_t vram[0x2000];
     uint8_t oam[0xA0];
 
@@ -217,13 +210,9 @@ ppu_write(PPU *ppu, uint16_t addr, uint8_t data)
 }
 
 void
-ppu_clear_frame(PPU *ppu, RGB color)
+ppu_clear_frame(PPU *ppu, uint8_t color)
 {
-    for (int y = 0; y < 144; y++) {
-        for (int x = 0; x < 160; x++) {
-            ppu->frame[y][x] = color;
-        }
-    }
+    memset(ppu->frame, color, sizeof(ppu->frame));
 }
 
 static inline uint16_t
@@ -278,7 +267,7 @@ ppu_render_tiles(PPU *ppu)
         uint8_t color_id = tile_line[pixel_x];
         uint8_t color = (ppu->BGP >> (color_id * 2)) & 0x3;
 
-        ppu->frame[screen_y][screen_x] = ppu_colors[color];
+        ppu->frame[screen_y][screen_x] = color;
     }
 }
 
@@ -333,7 +322,7 @@ ppu_render_sprites(PPU *ppu)
                 }
 
                 uint8_t color = (palette >> (color_id * 2)) & 0x3;
-                ppu->frame[screen_y][screen_x + xflip] = ppu_colors[color];
+                ppu->frame[screen_y][screen_x + xflip] = color;
             }
         }
     }
@@ -434,7 +423,7 @@ ppu_step_vblank(PPU *ppu)
 
         if (ppu->LY == 153) {
             ppu_set_mode(ppu, PPU_MODE_OAM_SCAN);
-            ppu_clear_frame(ppu, ppu_colors[0]);
+            ppu_clear_frame(ppu, 0);
             ppu->LY = 0;
         }
     }
@@ -463,10 +452,10 @@ ppu_step(PPU *ppu)
     }
 }
 
-inline const RGB *
+inline const uint8_t *
 ppu_get_frame(PPU *ppu)
 {
-    return (RGB *) ppu->frame;
+    return (uint8_t *) ppu->frame;
 }
 
 inline const uint8_t *
