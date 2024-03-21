@@ -141,6 +141,8 @@ gb_handle_input(MMU *mmu)
 static void
 gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_out)
 {
+    ui_set_debug(false);
+
     ui_init();
 
     uint64_t ticks = 0;
@@ -212,7 +214,7 @@ gb_get_mapper(ROM *rom)
 {
     switch (rom->header->type) {
     case ROM_TYPE_ROM_ONLY:
-        return mbc0_create(rom);
+        return mbc0_new(rom);
     case ROM_TYPE_MBC1:
     case ROM_TYPE_MBC1_RAM:
     case ROM_TYPE_MBC1_RAM_BATT:

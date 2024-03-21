@@ -7,6 +7,12 @@
 #include "ui.h"
 
 const Color ui_palettes[][4] = {
+    { // GREY
+        {255, 255, 255, 255},
+        {192, 192, 192, 255},
+        {96, 96, 96, 255},
+        {0, 0, 0, 255},
+    },
     { // GREEN
         {181, 198, 156, 255},
         {141, 156, 123, 255},
@@ -32,8 +38,15 @@ static struct {
     RenderTexture2D frame_texture;
     Color tileset_pixels[128*192];
     RenderTexture2D tileset_texture;
+    bool debug;
     int palette;
 } ui;
+
+void
+ui_set_debug(bool show_debug)
+{
+    ui.debug = show_debug;
+}
 
 void
 ui_init(void)
@@ -41,6 +54,10 @@ ui_init(void)
     SetTargetFPS(60);
     SetTraceLogLevel(LOG_ERROR);
     InitWindow(UI_WINDOW_WIDTH, UI_WINDOW_HEIGHT, "BrickBoy");
+
+    if (ui.debug) {
+        SetWindowSize(UI_WINDOW_WIDTH + UI_DEBUG_VIEW_WIDTH, UI_WINDOW_HEIGHT);
+    }
 
     ui.frame_texture = LoadRenderTexture(160, 144);
     ui.tileset_texture = LoadRenderTexture(128, 192);
@@ -99,6 +116,10 @@ ui_draw_tile(const uint8_t *vram, int tile_num, int pos_x, int pos_y, Color *pix
 void
 ui_update_debug_view(const uint8_t *vram)
 {
+    if (!ui.debug) {
+        return;
+    }
+
     BeginTextureMode(ui.tileset_texture);
 
     for (int tile_num  = 0; tile_num < 384; tile_num++) {
@@ -114,23 +135,39 @@ ui_update_debug_view(const uint8_t *vram)
     EndTextureMode();
 }
 
-static void
-ui_draw_overlay(void)
+static inline void
+ui_draw_fps_counter(void)
 {
+    if (!ui.debug) {
+        return;
+    }
+
     int fps = GetFPS();
     DrawText(strfmt("%d fps", fps), 3, 3, 10, BLACK);
     DrawText(strfmt("%d fps", fps), 2, 2, 10, WHITE);
 }
 
 static inline void
-ui_handle_hotkeys(void)
+ui_handle_palette_key(void)
 {
-    if (IsKeyPressed(KEY_ONE)) {
-        ui.palette = 0;
-    } else if (IsKeyPressed(KEY_TWO)) {
-        ui.palette = 1;
-    } else if (IsKeyPressed(KEY_THREE)) {
-        ui.palette = 2;
+    static int num_keys[] = {
+        KEY_ONE,
+        KEY_TWO,
+        KEY_THREE,
+        KEY_FOUR,
+        KEY_FIVE,
+        KEY_SIX,
+        KEY_SEVEN,
+        KEY_EIGHT,
+        KEY_NINE,
+        KEY_ZERO,
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(ui_palettes); i++) {
+        if (IsKeyPressed(num_keys[i])) {
+            ui.palette = (int) i;
+            break;
+        }
     }
 }
 
@@ -141,7 +178,7 @@ ui_refresh(void)
     BeginDrawing();
     ClearBackground(PURPLE);
 
-    ui_handle_hotkeys();
+    ui_handle_palette_key();
 
     static Vector2 origin = (Vector2) {0, 0};
 
@@ -150,10 +187,10 @@ ui_refresh(void)
     DrawTexturePro(ui.frame_texture.texture, frame_rect, frame_srect, origin, 0, WHITE);
 
     static Rectangle tileset_rect = (Rectangle) {0, 0, 128, 192};
-    static Rectangle tileset_srect = (Rectangle) {160*UI_SCALE, 0, 128*2, 192*2};
+    static Rectangle tileset_srect = (Rectangle) {160*UI_SCALE, 0, (int) UI_DEBUG_VIEW_WIDTH, (int) UI_DEBUG_VIEW_HEIGHT};
     DrawTexturePro(ui.tileset_texture.texture, tileset_rect, tileset_srect, origin, 0, WHITE);
 
-    ui_draw_overlay();
+    ui_draw_fps_counter();
     EndDrawing();
 }
 

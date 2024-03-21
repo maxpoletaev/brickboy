@@ -14,7 +14,7 @@ static IMapper mbc0_mapper = {
 };
 
 IMapper *
-mbc0_create(ROM *rom)
+mbc0_new(ROM *rom)
 {
     MBC0 *impl = xalloc(sizeof(MBC0));
     impl->imapper = mbc0_mapper;

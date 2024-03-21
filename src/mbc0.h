@@ -10,7 +10,7 @@ typedef struct {
     ROM *rom;
 } MBC0;
 
-IMapper *mbc0_create(ROM *ROM);
+IMapper *mbc0_new(ROM *ROM);
 
 void mbc0_write(IMapper *mapper, uint16_t addr, uint8_t data);
 

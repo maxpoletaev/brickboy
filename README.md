@@ -37,7 +37,7 @@ make
  * [ ] Window
  * [x] DMA
  * [x] Sprites 8x8
- * [ ] Sprites 8x16
+ * [x] Sprites 8x16
  * [ ] Scrolling
  * [ ] Sound
  * [x] Input
@@ -66,6 +66,8 @@ make
 |------|--------|-------|
 | Tetris | Playable ||
 | Dr. Mario | Playable ||
+| Super Mario Land | Playable ||
+| The Legend of Zelda: Link's Awakening | Playable ||
 
 ## Resources
 
