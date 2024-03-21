@@ -141,8 +141,6 @@ gb_handle_input(MMU *mmu)
 static void
 gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_out)
 {
-    ui_set_debug(false);
-
     ui_init();
 
     uint64_t ticks = 0;

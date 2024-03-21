@@ -78,3 +78,4 @@ make
 - [Test ROMs](https://github.com/retrio/gb-test-roms) (mirror of Blargg’s tests)
 - [The Gameboy Emulator Development Guide](https://hacktix.github.io/GBEDG/)
 - [Lazy Gameboy Emulator](https://cturt.github.io/cinoop.html)
+- [DRM-free Gameboy boot ROM](https://github.com/Hacktix/Bootix)

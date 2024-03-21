@@ -8,6 +8,7 @@
 #include "mmu.h"
 #include "serial.h"
 #include "ppu.h"
+#include "boot.h"
 #include "joypad.h"
 #include "interrupt.h"
 
@@ -41,8 +42,25 @@ mmu_reset(MMU *mmu)
     memset(mmu->ram, 0x00, sizeof(mmu->ram));
     memset(mmu->hram, 0xFF, sizeof(mmu->hram));
 
+    mmu->bootrom_mapped = true;
     mmu->IE = 0;
     mmu->IF = 0;
+}
+
+static inline uint8_t
+mmu_read_rom(MMU *mmu, uint16_t addr)
+{
+    if (mmu->bootrom_mapped) {
+        if (addr < 0x0100) {
+            return boot_rom_dmg[addr];
+        }
+
+        if (addr == 0x0100) {
+            mmu->bootrom_mapped = false;
+        }
+    }
+
+    return mapper_read(mmu->mapper, addr);
 }
 
 uint8_t
@@ -57,7 +75,7 @@ mmu_read(MMU *mmu, uint16_t addr)
     switch (addr) {
     case 0x0000 ... 0x7FFF: // ROM
     case 0xA000 ... 0xBFFF: // External RAM
-        return mapper_read(mmu->mapper, addr);
+        return mmu_read_rom(mmu, addr);
     case 0xC000 ... 0xDFFF: // Internal RAM
         return mmu->ram[addr - 0xC000];
     case 0xE000 ... 0xFDFF: // Internal RAM (mirror)

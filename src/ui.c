@@ -43,20 +43,15 @@ static struct {
 } ui;
 
 void
-ui_set_debug(bool show_debug)
-{
-    ui.debug = show_debug;
-}
-
-void
 ui_init(void)
 {
     SetTargetFPS(60);
     SetTraceLogLevel(LOG_ERROR);
     InitWindow(UI_WINDOW_WIDTH, UI_WINDOW_HEIGHT, "BrickBoy");
 
-    if (ui.debug) {
+    if (UI_SHOW_DEBUG_VIEW) {
         SetWindowSize(UI_WINDOW_WIDTH + UI_DEBUG_VIEW_WIDTH, UI_WINDOW_HEIGHT);
+        ui.debug = true;
     }
 
     ui.frame_texture = LoadRenderTexture(160, 144);

@@ -34,7 +34,7 @@ cpu_reset(CPU *cpu)
     cpu->DE = 0x00D8;
     cpu->HL = 0x014D;
     cpu->SP = 0xFFFE;
-    cpu->PC = 0x0100; // skip the boot rom for now
+    cpu->PC = 0x0000;
     cpu->IME = 0;
 
     cpu->ime_delay = -1;

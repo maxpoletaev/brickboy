@@ -7,7 +7,7 @@
 #include "ppu.h"
 
 #define UI_SCALE 3
-#define UI_SHOW_FPS 0
+#define UI_SHOW_DEBUG_VIEW 0
 #define UI_WINDOW_HEIGHT (144 * UI_SCALE)
 #define UI_WINDOW_WIDTH ((160 * UI_SCALE))
 #define UI_DEBUG_VIEW_WIDTH (128 * (UI_SCALE+1) / 2)
@@ -30,7 +30,5 @@ void ui_refresh(void);
 bool ui_should_pause(void);
 
 bool ui_should_close(void);
-
-void ui_set_debug(bool debug);
 
 void ui_close(void);
