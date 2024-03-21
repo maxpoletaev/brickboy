@@ -224,6 +224,23 @@ ppu_tile_addr(PPU *ppu, uint8_t tile_id)
     return 0x9000 + (int8_t) tile_id * 16;
 }
 
+static inline uint8_t
+ppu_get_color_id(uint8_t d0, uint8_t d1, uint8_t x)
+{
+    uint8_t color_id = 0;
+    uint8_t mask = 1 << x;
+
+    if (d0 & mask) {
+        color_id |= 0x1;
+    }
+
+    if (d1 & mask) {
+        color_id |= 0x2;
+    }
+
+    return color_id;
+}
+
 static void
 ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixels[8])
 {
@@ -233,13 +250,11 @@ ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixel
     uint8_t tile_id = ppu_read_vram(ppu, tile_map_addr);
     uint16_t tile_addr = ppu_tile_addr(ppu, tile_id);
 
-    uint8_t b0 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 0);
-    uint8_t b1 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 1);
+    uint8_t d0 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 0);
+    uint8_t d1 = ppu_read_vram(ppu, tile_addr + pixel_y*2 + 1);
 
     for (int x = 0; x < 8; x++) {
-        uint8_t px = ((b0 >> x) & 0x1) << 1;
-        px |= ((b1 >> x) & 0x1) << 0;
-        pixels[7-x] = px;
+        pixels[7-x] = ppu_get_color_id(d0, d1, x);
     }
 }
 
@@ -322,9 +337,7 @@ ppu_render_sprites(PPU *ppu)
                 break;
             }
 
-            uint8_t color_id = ((d0 >> x) & 0x1) << 1;
-            color_id |= ((d1 >> x) & 0x1) << 0;
-
+            uint8_t color_id = ppu_get_color_id(d0, d1, x);
             if (color_id == 0) {
                 continue;
             }
