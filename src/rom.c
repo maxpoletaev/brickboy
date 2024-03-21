@@ -29,19 +29,11 @@ rom_load(ROM *rom, FILE *file, uint32_t file_size)
     return RET_OK;
 }
 
-static const char *
-rom_title(ROM *rom)
-{
-    static char title[ROM_TITLE_SIZE + 1] = {0};
-    strncpy(title, (char *) rom->header->title, ROM_TITLE_SIZE);
-    title[ROM_TITLE_SIZE] = '\0';
-    return title;
-}
-
 ROM *
 rom_open(const char *filename)
 {
     ROM *rom = NULL;
+    struct stat file_info;
     FILE *file _autoclose_ = NULL;
 
     file = fopen(filename, "rb");
@@ -50,21 +42,37 @@ rom_open(const char *filename)
         goto failure;
     }
 
-    struct stat file_info;
     if (stat(filename, &file_info) != 0) {
         TRACE("failed to STAT file: %s", filename);
         goto failure;
     }
 
     rom = xalloc(sizeof(ROM));
-    uint32_t file_size = (uint32_t) file_info.st_size;
+    uint32_t file_size = file_info.st_size;
+
     if (rom_load(rom, file, file_size) != RET_OK) {
         TRACE("failed to load rom: %s", filename);
         goto failure;
     }
 
-    const char *title = rom_title(rom);
-    LOG("rom loaded: %s (TYPE:%02X)", title, rom->header->type);
+    switch (rom->header->ram_size) {
+    case 0x00: rom->ram_size = 0; break;
+    case 0x01: rom->ram_size = 2*1024; break;
+    case 0x02: rom->ram_size = 8*1024; break;
+    case 0x03: rom->ram_size = 32*1024; break;
+    case 0x04: rom->ram_size = 128*1024; break;
+    case 0x05: rom->ram_size = 64*1024; break;
+    default: PANIC("invalid ram size: %02X", rom->header->ram_size);
+    }
+
+    char title[ROM_TITLE_SIZE + 1] = {0};
+    strncpy(title, rom->header->title, ROM_TITLE_SIZE);
+
+    LOG("ROM loaded:");
+    LOG("  Title: %s", title);
+    LOG("  Type: 0x%02X", rom->header->type);
+    LOG("  RAM Size: %dKB", rom->ram_size / 1024);
+    LOG("  ROM Size: %dKB", rom->size / 1024);
 
     return rom;
 

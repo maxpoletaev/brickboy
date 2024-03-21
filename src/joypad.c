@@ -4,7 +4,6 @@
 #include "common.h"
 #include "joypad.h"
 
-
 Joypad *
 joypad_new(void)
 {
@@ -74,6 +73,7 @@ joypad_press(Joypad *joypad, JoypadButton button)
     case JOYPAD_DOWN:
         joypad->dpad &= ~0x08;
         break;
+
     case JOYPAD_A:
         joypad->buttons &= ~0x01;
         break;
@@ -86,6 +86,7 @@ joypad_press(Joypad *joypad, JoypadButton button)
     case JOYPAD_START:
         joypad->buttons &= ~0x08;
         break;
+
     default:
         PANIC("invalid button: %d", button);
     }

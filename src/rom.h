@@ -8,9 +8,14 @@
 #define ROM_MAX_SIZE (2 * 1024 * 1024) // 2MB
 #define ROM_TITLE_SIZE 16
 
+#define ROM_BANK_SIZE 0x4000
+#define RAM_BANK_SIZE 0x2000
+
 enum ROMType {
     ROM_TYPE_ROM_ONLY = 0x00,
     ROM_TYPE_MBC1 = 0x01,
+    ROM_TYPE_MBC1_RAM = 0x02,
+    ROM_TYPE_MBC1_RAM_BATT = 0x03,
 };
 
 typedef struct {
@@ -31,8 +36,10 @@ typedef struct {
 
 typedef struct {
     ROMHeader *header;
-    uint8_t *data;
     uint32_t size;
+    uint8_t *data;
+    uint32_t rom_size;
+    uint32_t ram_size;
 } ROM;
 
 ROM *rom_open(const char *filename);

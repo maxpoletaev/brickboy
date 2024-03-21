@@ -16,6 +16,8 @@
 
 #define CONTAINER_OF(ptr, type, member) ((type *) ((char *) (ptr) - offsetof(type, member)))
 
+#define BOUNDS_CHECK(size, index) if ((index) >= (size)) PANIC("index out of bounds: %u", (uint32_t)(index))
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #define SETBIT(x, n) ((x) |= (1 << (n)))

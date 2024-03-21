@@ -19,6 +19,7 @@
 #include "ppu.h"
 #include "ui.h"
 #include "mbc0.h"
+#include "mbc1.h"
 #include "joypad.h"
 #include "interrupt.h"
 
@@ -27,18 +28,21 @@ bitfield_test(void)
 {
     union {
         struct {
-            uint32_t a : 8;
-            uint32_t b : 8;
-            uint32_t c : 8;
             uint32_t d : 8;
+            uint32_t c : 8;
+            uint32_t b : 8;
+            uint32_t a : 8;
         } _packed_;
         uint32_t raw;
     } test;
 
-    test.raw = 0x01020304;
+    test.a = 0x01;
+    test.b = 0x02;
+    test.c = 0x03;
+    test.d = 0x04;
 
-    if (test.a != 0x04 || test.b != 0x03 || test.c != 0x02 || test.d != 0x01) {
-        PANIC("Byte order test failed");
+    if (test.raw != 0x01020304) {
+        PANIC("byte order test failed: 0x%08X", test.raw);
     }
 }
 
@@ -56,7 +60,8 @@ print_logo(void)
 static FILE*
 output_file(const char *filename)
 {
-    if (strcmp(filename, "-") == 0 || strcmp(filename, "stdout") == 0) {
+    if (strcmp(filename, "-") == 0 ||
+        strcmp(filename, "stdout") == 0) {
         return stdout;
     }
 
@@ -88,7 +93,7 @@ gb_print_state(CPU *cpu, MMU *bus, FILE *out)
     fprintf(out, " (%02X %02X %02X %02X)\n", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-static inline bool
+static inline void
 gb_handle_interrupts(CPU *cpu, MMU *mmu)
 {
     static const uint8_t ints[] =  {INT_VBLANK, INT_LCD_STAT, INT_TIMER, INT_SERIAL, INT_JOYPAD};
@@ -96,7 +101,7 @@ gb_handle_interrupts(CPU *cpu, MMU *mmu)
     static_assert(ARRAY_SIZE(ints) == ARRAY_SIZE(addrs), "");
 
     if (mmu->IF == 0 || mmu->IE == 0) {
-        return false;
+        return;
     }
 
     for (size_t i = 0; i < ARRAY_SIZE(ints); i++) {
@@ -104,16 +109,14 @@ gb_handle_interrupts(CPU *cpu, MMU *mmu)
         bool enabled = mmu_interrupt_enabled(mmu, ints[i]);
 
         if (requested && enabled) {
-            if (!cpu_interrupt(cpu, mmu, addrs[i])) {
-                return false;
+            if (cpu_interrput_enabled(cpu)) {
+                mmu_clear_interrupt(mmu, ints[i]);
+                cpu_interrupt(cpu, mmu, addrs[i]);
             }
 
-            mmu_clear_interrupt(mmu, ints[i]);
-            return true;
+            return;
         }
     }
-
-    return false;
 }
 
 static inline void
@@ -155,8 +158,6 @@ gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state
                     fputs(strbuf_get(disasm_buf), debug_out);
                     fputc('\n', debug_out);
                 }
-
-                // serial_print(mmu->serial);
             }
 
             // CPU is clocked at 1/4 of the master clock.
@@ -212,6 +213,10 @@ gb_get_mapper(ROM *rom)
     switch (rom->header->type) {
     case ROM_TYPE_ROM_ONLY:
         return mbc0_create(rom);
+    case ROM_TYPE_MBC1:
+    case ROM_TYPE_MBC1_RAM:
+    case ROM_TYPE_MBC1_RAM_BATT:
+        return mbc1_new(rom);
     default:
         LOG("unknown mapper: %02X", rom->header->type);
         return NULL;

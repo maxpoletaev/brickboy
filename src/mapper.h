@@ -9,9 +9,6 @@
 struct IMapper;
 
 typedef struct IMapper {
-    uint8_t id;
-    const char *name;
-
     void (*write)(struct IMapper *mapper, uint16_t addr, uint8_t data);
     uint8_t (*read)(struct IMapper *mapper, uint16_t addr);
     void (*reset)(struct IMapper *mapper);

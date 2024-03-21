@@ -152,13 +152,12 @@ ppu_read(PPU *ppu, uint16_t addr)
 static inline uint8_t
 ppu_read_vram(PPU *ppu, uint16_t addr)
 {
-#ifndef NDEBUG
-    if (addr < 0x8000 || addr > 0x9FFF) {
-        PANIC("invalid VRAM read at 0x%04X", addr);
+    uint16_t vram_addr = addr - 0x8000;
+    if (vram_addr >= sizeof(ppu->vram)) {
+        PANIC("invalid VRAM address: 0x%04X", addr);
     }
-#endif
 
-    return ppu->vram[addr - 0x8000];
+    return ppu->vram[vram_addr];
 }
 
 void
@@ -306,6 +305,7 @@ ppu_render_sprites(PPU *ppu)
             uint8_t screen_y = ppu->LY - 16;
             uint8_t yflip = sprite.yflip ? 7-y : y;
             uint16_t tile_addr = 0x8000 + sprite.tile_id * 16;
+
             uint8_t d0 = ppu_read_vram(ppu, tile_addr + yflip*2 + 0);
             uint8_t d1 = ppu_read_vram(ppu, tile_addr + yflip*2 + 1);
 
@@ -313,9 +313,8 @@ ppu_render_sprites(PPU *ppu)
                 uint8_t screen_x = sprite.x - 8;
                 uint8_t xflip = sprite.xflip ? x : 7-x;
 
-                uint8_t c0 = ((d0 >> x) & 0x1) << 1;
-                uint8_t c1 = ((d1 >> x) & 0x1) << 0;
-                uint8_t color_id = c0 | c1;
+                uint8_t color_id = ((d0 >> x) & 0x1) << 1;
+                color_id |= ((d1 >> x) & 0x1) << 0;
 
                 if (color_id == 0) {
                     continue;

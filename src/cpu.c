@@ -298,13 +298,19 @@ cpu_decode(MMU *bus, uint16_t pc)
     return op;
 }
 
-bool
+inline bool
+cpu_interrput_enabled(CPU *cpu)
+{
+    return cpu->IME != 0;
+}
+
+void
 cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr)
 {
     cpu->halted = false;
 
     if (cpu->IME == 0) {
-        return false;
+        return;
     }
 
     cpu->IME = 0; // disable interrupts
@@ -312,8 +318,6 @@ cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr)
     cpu_push(cpu, bus, cpu->PC);
 
     cpu->PC = addr;
-
-    return true;
 }
 
 static inline const Instruction *

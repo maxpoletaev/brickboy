@@ -7,8 +7,6 @@
 #include "rom.h"
 
 static IMapper mbc0_mapper = {
-    .id = 0x00,
-    .name = "MBC0",
     .write = mbc0_write,
     .read = mbc0_read,
     .reset = mbc0_reset,
@@ -43,11 +41,9 @@ mbc0_read(IMapper *mapper, uint16_t addr)
 {
     MBC0 *impl = CONTAINER_OF(mapper, MBC0, imapper);
 
-#ifndef NDEBUG
     if (addr >= impl->rom->size) {
-        PANIC("out of bounds read at 0x%04X", addr);
+        PANIC("address out of range: 0x%04X", addr);
     }
-#endif
 
     return impl->rom->data[addr];
 }

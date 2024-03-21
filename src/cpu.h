@@ -145,7 +145,9 @@ void cpu_reset(CPU *cpu);
 
 void cpu_step(CPU *cpu, MMU *bus);
 
-bool cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr);
+bool cpu_interrput_enabled(CPU *cpu);
+
+void cpu_interrupt(CPU *cpu, MMU *bus, uint16_t addr);
 
 const Instruction *cpu_decode(MMU *bus, uint16_t pc);
 
