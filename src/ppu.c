@@ -245,7 +245,6 @@ static void
 ppu_fetch_tile_line(PPU *ppu, uint16_t tile_map, int tile_y, int tile_x, int pixel_y, uint8_t pixels[8])
 {
     uint16_t tile_map_addr = tile_map + tile_y*32 + tile_x;
-
     uint8_t tile_id = ppu_read_vram(ppu, tile_map_addr);
     uint16_t tile_addr = ppu_tile_addr(ppu, tile_id);
 
@@ -334,29 +333,23 @@ ppu_get_sprite(PPU *ppu, int sprite_id)
 static inline void
 ppu_render_sprites(PPU *ppu)
 {
-    uint8_t height = ppu->LCDC.obj_size ? 16 : 8;
-    uint8_t scanline = ppu->LY;
-
-    uint8_t screen_y = scanline - 16;
+    uint8_t screen_y = ppu->LY;
     if (screen_y >= 144) {
         return;
     }
 
+    uint8_t height = ppu->LCDC.obj_size ? 16 : 8;
+
     for (int i = 0; i < 40; i++) {
         Sprite sprite = ppu_get_sprite(ppu, i);
-
-        // Check if the sprite is visible.
-        if ((sprite.y == 0 || sprite.y >= 160) ||
-            (sprite.x == 0 || sprite.x >= 168)) {
-            continue;
-        }
+        int real_sprite_y = sprite.y - 16;
 
         // Check if the current scanline is within the sprite's Y range.
-        if (sprite.y > scanline || sprite.y+height <= scanline) {
+        if (real_sprite_y > screen_y || real_sprite_y+height <= screen_y) {
             continue;
         }
 
-        uint8_t y = scanline - sprite.y;
+        uint8_t y = screen_y - real_sprite_y;
         uint8_t yflip = sprite.yflip ? height-1-y : y;
         uint16_t tile_addr = 0x8000 + sprite.tile_id * 16;
         uint8_t palette = sprite.palette ? ppu->OBP1 : ppu->OBP0;
