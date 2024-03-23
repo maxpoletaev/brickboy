@@ -37,6 +37,7 @@ cpu_reset(CPU *cpu)
     cpu->PC = 0x0000;
     cpu->IME = 0;
 
+    cpu->halted = false;
     cpu->ime_delay = -1;
     cpu->cycle = 0;
     cpu->step = 0;

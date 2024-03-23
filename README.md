@@ -1,6 +1,8 @@
-# BrickBoy
+# Brick Boy
 
-WIP Gameboy Emulator
+WIP Game boy emulator
+
+![Screenshots](screenshots.png)
 
 ## Building
 
@@ -22,11 +24,16 @@ make
 ## Controls
 
 * `W` `A` `S` `D` - D-Pad
-* `Enter` - Start
 * `RShift` - Select
+* `Enter` - Start
 * `J` - A
 * `K` - B
-* `1` `2` `3` - Color palettes
+
+## Hotkeys
+
+* `F1` - Toggle debug view
+* `F2` - Change color palette
+* `F12` - Take screenshot
 * `Esc` - Quit
 
 ## Status

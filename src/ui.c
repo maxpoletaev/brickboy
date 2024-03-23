@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include <stddef.h>
 
 #include "common.h"
 #include "raylib.h"
@@ -147,26 +146,30 @@ ui_draw_fps_counter(void)
 }
 
 static inline void
-ui_handle_palette_key(void)
+ui_handle_hotkeys(void)
 {
-    static int num_keys[] = {
-        KEY_ONE,
-        KEY_TWO,
-        KEY_THREE,
-        KEY_FOUR,
-        KEY_FIVE,
-        KEY_SIX,
-        KEY_SEVEN,
-        KEY_EIGHT,
-        KEY_NINE,
-        KEY_ZERO,
-    };
-
-    for (size_t i = 0; i < ARRAY_SIZE(ui_palettes); i++) {
-        if (IsKeyPressed(num_keys[i])) {
-            ui.palette = (int) i;
-            break;
+    // Toggle debug view
+    if (IsKeyPressed(KEY_F1)) {
+        ui.debug = !ui.debug;
+        if (ui.debug) {
+            SetWindowSize(UI_WINDOW_WIDTH + UI_DEBUG_VIEW_WIDTH, UI_WINDOW_HEIGHT);
+        } else {
+            SetWindowSize(UI_WINDOW_WIDTH, UI_WINDOW_HEIGHT);
         }
+
+        return;
+    }
+
+    // Cycle through palettes
+    if (IsKeyPressed(KEY_F2)) {
+        ui.palette = (int) ((ui.palette + 1) % ARRAY_SIZE(ui_palettes));
+        return;
+    }
+
+    //  Take a screenshot
+    if (IsKeyPressed(KEY_F12)) {
+        TakeScreenshot(TextFormat("screenshot-%03d.png", GetRandomValue(0, 1000)));
+        return;
     }
 }
 
@@ -177,7 +180,7 @@ ui_refresh(void)
     BeginDrawing();
     ClearBackground(PURPLE);
 
-    ui_handle_palette_key();
+    ui_handle_hotkeys();
 
     static Vector2 origin = (Vector2) {0, 0};
 

@@ -4,12 +4,14 @@
 
 #include "binario.h"
 
-size_t fwrite_u8(uint8_t data, FILE *file)
+size_t
+fwrite_u8(uint8_t data, FILE *file)
 {
     return fwrite(&data, sizeof(uint8_t), 1, file);
 }
 
-size_t fwrite_u16(uint16_t data, FILE *file)
+size_t
+fwrite_u16(uint16_t data, FILE *file)
 {
     uint8_t buf[2] = {
         (data >> 0) & 0xFF,
@@ -19,7 +21,8 @@ size_t fwrite_u16(uint16_t data, FILE *file)
     return fwrite(buf, sizeof(uint8_t), 2, file);
 }
 
-size_t fwrite_u32(uint32_t data, FILE *file)
+size_t
+fwrite_u32(uint32_t data, FILE *file)
 {
     uint8_t buf[4];
     for (int i = 0; i < 4; i++) {
@@ -29,7 +32,8 @@ size_t fwrite_u32(uint32_t data, FILE *file)
     return fwrite(buf, sizeof(uint8_t), 4, file);
 }
 
-size_t fwrite_u64(uint64_t data, FILE *file)
+size_t
+fwrite_u64(uint64_t data, FILE *file)
 {
     uint8_t buf[8];
     for (int i = 0; i < 4; i++) {
@@ -39,12 +43,14 @@ size_t fwrite_u64(uint64_t data, FILE *file)
     return fwrite(buf, sizeof(uint8_t), 8, file);
 }
 
-size_t fread_u8(uint8_t *data, FILE *file)
+size_t
+fread_u8(uint8_t *data, FILE *file)
 {
     return fread(data, sizeof(uint8_t), 1, file);
 }
 
-size_t fread_u16(uint16_t *data, FILE *file)
+size_t
+fread_u16(uint16_t *data, FILE *file)
 {
     uint8_t buf[2];
     size_t ret = fread(buf, sizeof(uint8_t), 2, file);
@@ -53,7 +59,8 @@ size_t fread_u16(uint16_t *data, FILE *file)
     return ret;
 }
 
-size_t fread_u32(uint32_t *data, FILE *file)
+size_t
+fread_u32(uint32_t *data, FILE *file)
 {
     uint8_t buf[4];
     size_t ret = fread(buf, sizeof(uint8_t), 4, file);
@@ -66,7 +73,8 @@ size_t fread_u32(uint32_t *data, FILE *file)
 
 }
 
-size_t fread_u64(uint64_t *data, FILE *file)
+size_t
+fread_u64(uint64_t *data, FILE *file)
 {
     uint8_t buf[8] = {0};
     size_t ret = fread(buf, sizeof(uint8_t), 8, file);

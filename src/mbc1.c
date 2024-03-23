@@ -164,7 +164,7 @@ mbc1_load(IMapper *mapper, const char *filename)
             return RET_OK;
         }
 
-        TRACE("failed to open file: %s (%d)", filename, errno);
+        TRACE("failed to open file: %s (%s)", filename, strerror(errno));
         return RET_ERR;
     }
 

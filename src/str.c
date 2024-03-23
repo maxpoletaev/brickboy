@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "common.h"
 #include "str.h"
@@ -143,4 +144,18 @@ str_trunc(String str, size_t len)
     }
 
     return str;
+}
+
+bool
+str_cmp(String str, String other)
+{
+    if (str.len != other.len) {
+        return false;
+    }
+
+    if (str.ptr == other.ptr) {
+        return true;
+    }
+
+    return memcmp(str.ptr, other.ptr, str.len) == 0;
 }

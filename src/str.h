@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct {
     char *ptr;
@@ -23,6 +24,8 @@ String str_clone(String str);
 String str_add(String str, const char *add);
 
 String str_addc(String str, char add);
+
+bool str_cmp(String str, String other);
 
 String str_addf(String str, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 

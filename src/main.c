@@ -234,6 +234,21 @@ gb_get_mapper(ROM *rom)
     }
 }
 
+static String
+gb_trunc_ext(String str)
+{
+    size_t pos = str.len;
+    while (pos > 0 && str.ptr[pos] != '.') {
+        pos--;
+    }
+
+    if (pos > 0) {
+        str = str_trunc(str, pos);
+    }
+
+    return str;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -279,7 +294,8 @@ main(int argc, char **argv)
     }
 
     String save_file _cleanup_(str_free) = str_new_from(opts.romfile);
-    save_file = str_add(save_file, ".battery");
+    save_file = gb_trunc_ext(save_file);
+    save_file = str_add(save_file, ".save");
 
     // Load battery-backed RAM
     if (mapper_load_state(mapper, save_file.ptr) != RET_OK) {
