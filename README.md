@@ -34,7 +34,7 @@ make
  * [x] CPU
  * [x] Timer
  * [x] Background
- * [ ] Window
+ * [x] Window
  * [x] DMA
  * [x] Sprites 8x8
  * [x] Sprites 8x16
@@ -42,8 +42,8 @@ make
  * [ ] Sound
  * [x] Input
  * [ ] Mappers
- * [ ] Boot ROM
- * [ ] Save states
+ * [x] Boot ROM
+ * [x] Battery save
 
 ## CPU tests (Blargg's)
 

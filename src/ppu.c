@@ -242,9 +242,8 @@ ppu_get_color_id(uint8_t d0, uint8_t d1, uint8_t x)
 }
 
 static void
-ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixels[8])
+ppu_fetch_tile_line(PPU *ppu, uint16_t tile_map, int tile_y, int tile_x, int pixel_y, uint8_t pixels[8])
 {
-    uint16_t tile_map = ppu->LCDC.bg_tilemap ? 0x9C00 : 0x9800;
     uint16_t tile_map_addr = tile_map + tile_y*32 + tile_x;
 
     uint8_t tile_id = ppu_read_vram(ppu, tile_map_addr);
@@ -261,12 +260,13 @@ ppu_fetch_tile_line(PPU *ppu, int tile_y, int tile_x, int pixel_y, uint8_t pixel
 static inline void
 ppu_render_background(PPU *ppu)
 {
+    uint16_t tile_map = ppu->LCDC.bg_tilemap ? 0x9C00 : 0x9800;
     uint8_t screen_y = ppu->LY;
 
     int tile_y = ((ppu->LY + ppu->SCY) / 8) % 32;
     int pixel_y = (ppu->LY + ppu->SCY) % 8;
 
-    uint8_t tile_line[8];
+    uint8_t tile_line[8] = {0};
     int last_tile_x = -1;
 
     for (int screen_x = 0; screen_x < 160; screen_x++) {
@@ -274,7 +274,42 @@ ppu_render_background(PPU *ppu)
         int pixel_x = (ppu->SCX + screen_x) % 8;
 
         if (tile_x != last_tile_x) {
-            ppu_fetch_tile_line(ppu, tile_y, tile_x, pixel_y, tile_line);
+            ppu_fetch_tile_line(ppu, tile_map, tile_y, tile_x, pixel_y, tile_line);
+            last_tile_x = tile_x;
+        }
+
+        uint8_t color_id = tile_line[pixel_x];
+        uint8_t color = (ppu->BGP >> (color_id * 2)) & 0x3;
+
+        ppu->frame[screen_y][screen_x] = color;
+    }
+}
+
+static inline void
+ppu_render_window(PPU *ppu)
+{
+    if (ppu->LY < ppu->WY) {
+        return;
+    }
+
+    uint16_t tile_map = ppu->LCDC.win_tilemap ? 0x9C00 : 0x9800;
+    int tile_y = ((ppu->LY - ppu->WY) / 8) % 32;
+    int pixel_y = (ppu->LY - ppu->WY) % 8;
+    uint8_t screen_y = ppu->LY;
+
+    uint8_t tile_line[8] = {0};
+    int last_tile_x = -1;
+
+    for (int screen_x = 0; screen_x < 160; screen_x++) {
+        if (screen_x+7 < ppu->WX) {
+            continue;
+        }
+
+        int tile_x = ((screen_x+7 - ppu->WX) / 8) % 32;
+        int pixel_x = (screen_x+7 - ppu->WX) % 8;
+
+        if (tile_x != last_tile_x) {
+            ppu_fetch_tile_line(ppu, tile_map, tile_y, tile_x, pixel_y, tile_line);
             last_tile_x = tile_x;
         }
 
@@ -353,6 +388,10 @@ ppu_render_scanline(PPU *ppu)
 {
     if (ppu->LCDC.bg_enable) {
         ppu_render_background(ppu);
+
+        if (ppu->LCDC.win_enable) {
+            ppu_render_window(ppu);
+        }
     }
 
     if (ppu->LCDC.obj_enable) {
