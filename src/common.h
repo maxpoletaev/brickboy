@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unistd.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -31,10 +32,6 @@
         fprintf(stderr, "panic: " fmt " (%s:%d)\n", ##__VA_ARGS__, __func__, __LINE__); \
         exit(3); \
     } while (0)
-
-// Format a string intended for temporary use (e.g. logging).
-// Returns a pointer to a static buffer that is overwritten on each call.
-const char *strfmt(const char *fmt, ...);
 
 // Allocates a zeroed block of memory and panics if allocation fails.
 void *xalloc(size_t size);

@@ -11,6 +11,8 @@ static IMapper mbc0_mapper = {
     .read = mbc0_read,
     .reset = mbc0_reset,
     .free = mbc0_free,
+    .load_state = mbc0_load,
+    .save_state = mbc0_save,
 };
 
 IMapper *
@@ -54,4 +56,20 @@ mbc0_write(IMapper *mapper, uint16_t addr, uint8_t data)
     UNUSED(mapper);
     UNUSED(data);
     TRACE("write to read-only memory at 0x%04X", addr);
+}
+
+int
+mbc0_load(IMapper *mapper, const char *filename)
+{
+    UNUSED(mapper);
+    UNUSED(filename);
+    return RET_OK;
+}
+
+int
+mbc0_save(IMapper *mapper, const char *filename)
+{
+    UNUSED(mapper);
+    UNUSED(filename);
+    return RET_OK;
 }

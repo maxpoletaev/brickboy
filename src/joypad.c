@@ -61,33 +61,14 @@ void inline
 joypad_press(Joypad *joypad, JoypadButton button)
 {
     switch (button) {
-    case JOYPAD_RIGHT:
-        joypad->dpad &= ~0x01;
-        break;
-    case JOYPAD_LEFT:
-        joypad->dpad &= ~0x02;
-        break;
-    case JOYPAD_UP:
-        joypad->dpad &= ~0x04;
-        break;
-    case JOYPAD_DOWN:
-        joypad->dpad &= ~0x08;
-        break;
-
-    case JOYPAD_A:
-        joypad->buttons &= ~0x01;
-        break;
-    case JOYPAD_B:
-        joypad->buttons &= ~0x02;
-        break;
-    case JOYPAD_SELECT:
-        joypad->buttons &= ~0x04;
-        break;
-    case JOYPAD_START:
-        joypad->buttons &= ~0x08;
-        break;
-
-    default:
-        PANIC("invalid button: %d", button);
+    case JOYPAD_RIGHT: joypad->dpad &= ~0x01; break;
+    case JOYPAD_LEFT: joypad->dpad &= ~0x02; break;
+    case JOYPAD_UP: joypad->dpad &= ~0x04; break;
+    case JOYPAD_DOWN: joypad->dpad &= ~0x08; break;
+    case JOYPAD_A: joypad->buttons &= ~0x01; break;
+    case JOYPAD_B: joypad->buttons &= ~0x02; break;
+    case JOYPAD_SELECT: joypad->buttons &= ~0x04; break;
+    case JOYPAD_START: joypad->buttons &= ~0x08; break;
+    default: PANIC("invalid button: %d", button);
     }
 }

@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "common.h"
 #include "raylib.h"
@@ -55,7 +56,10 @@ ui_init(void)
     }
 
     ui.frame_texture = LoadRenderTexture(160, 144);
+    SetTextureFilter(ui.frame_texture.texture, UI_FILTER);
+
     ui.tileset_texture = LoadRenderTexture(128, 192);
+    SetTextureFilter(ui.tileset_texture.texture, UI_FILTER);
 }
 
 void
@@ -138,8 +142,8 @@ ui_draw_fps_counter(void)
     }
 
     int fps = GetFPS();
-    DrawText(strfmt("%d fps", fps), 3, 3, 10, BLACK);
-    DrawText(strfmt("%d fps", fps), 2, 2, 10, WHITE);
+    DrawText(TextFormat("%d fps", fps), 3, 3, 10, BLACK);
+    DrawText(TextFormat("%d fps", fps), 2, 2, 10, WHITE);
 }
 
 static inline void

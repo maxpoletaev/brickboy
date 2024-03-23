@@ -26,6 +26,20 @@ mapper_reset(IMapper *mapper)
     mapper->reset(mapper);
 }
 
+int
+mapper_save_state(IMapper *mapper, const char *filename)
+{
+    assert(mapper->save_state != NULL);
+    return mapper->save_state(mapper, filename);
+}
+
+int
+mapper_load_state(IMapper *mapper, const char *filename)
+{
+    assert(mapper->load_state != NULL);
+    return mapper->load_state(mapper, filename);
+}
+
 inline void
 mapper_free(IMapper **mapper)
 {

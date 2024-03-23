@@ -76,6 +76,7 @@ make
 - [Opcodes Table](https://meganesu.github.io/generate-gb-opcodes/) by meganesu
 - [Gameboy Logs](https://github.com/wheremyfoodat/Gameboy-logs) by wheremyfoodat
 - [Test ROMs](https://github.com/retrio/gb-test-roms) (mirror of Blargg’s tests)
-- [The Gameboy Emulator Development Guide](https://hacktix.github.io/GBEDG/)
-- [Lazy Gameboy Emulator](https://cturt.github.io/cinoop.html)
-- [DRM-free Gameboy boot ROM](https://github.com/Hacktix/Bootix)
+- [The Gameboy Emulator Development Guide](https://hacktix.github.io/GBEDG/) by Hacktix
+- [Bootix - DRM-free Gameboy boot ROM](https://github.com/Hacktix/Bootix) by Hacktix
+- [Lazy Gameboy Emulator](https://cturt.github.io/cinoop.html) by CTurt
+- [Gameboy Palettes](https://www.deviantart.com/thewolfbunny64/gallery/69987002/game-boy-palettes) by TheWolfBunny64

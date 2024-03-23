@@ -1,17 +1,23 @@
+#include <errno.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 
 #include "common.h"
+#include "binario.h"
 #include "mapper.h"
 #include "mbc1.h"
 #include "rom.h"
+#include "str.h"
 
 static IMapper mbc1_mapper = {
     .write = mbc1_write,
     .read = mbc1_read,
     .free = mbc1_free,
     .reset = mbc1_reset,
+    .load_state = mbc1_load,
+    .save_state = mbc1_save,
 };
 
 IMapper *
@@ -23,6 +29,10 @@ mbc1_new(ROM *rom)
 
     impl->ram = xalloc(rom->ram_size);
     impl->ram_size = rom->ram_size;
+
+    if (impl->rom->header->type == ROM_TYPE_MBC1_RAM_BATT) {
+        impl->has_battery = true;
+    }
 
     mbc1_reset(&impl->imapper);
     return &impl->imapper;
@@ -39,11 +49,9 @@ mbc1_free(IMapper *mapper)
 void mbc1_reset(IMapper *mapper)
 {
     MBC1 *impl = CONTAINER_OF(mapper, MBC1, imapper);
-    memset(impl->ram, 0, impl->ram_size);
-
+    impl->ram_enabled = false;
     impl->rom_bank = 1;
     impl->ram_bank = 0;
-    impl->ram_enabled = false;
 }
 
 uint8_t
@@ -102,4 +110,79 @@ mbc1_write(IMapper *mapper, uint16_t addr, uint8_t data)
     default:
         PANIC("unknown write address: 0x%04X", addr);
     }
+}
+
+int
+mbc1_save(IMapper *mapper, const char *filename)
+{
+    MBC1 *impl = CONTAINER_OF(mapper, MBC1, imapper);
+    if (!impl->has_battery) {
+        return RET_OK;
+    }
+
+    String tmpfile _cleanup_(str_free) = str_new();
+    tmpfile = str_add(tmpfile, filename);
+    tmpfile = str_add(tmpfile, ".tmp");
+
+    FILE *f _autoclose_ = fopen(tmpfile.ptr, "wb");
+
+    if (f == NULL) {
+        TRACE("failed to open file: %s", filename);
+        return RET_ERR;
+    }
+
+    fwrite_u16(impl->rom->header->global_checksum, f);
+    fwrite(impl->ram, impl->ram_size, 1, f);
+
+    if (ferror(f)) {
+        TRACE("failed to write to file: %s", filename);
+        return RET_ERR;
+    }
+
+    if (rename(tmpfile.ptr, filename) != 0) {
+        TRACE("failed to rename file: %s", filename);
+        return RET_ERR;
+    }
+
+    LOG("saved battery file: %s", filename);
+
+    return RET_OK;
+}
+
+int
+mbc1_load(IMapper *mapper, const char *filename)
+{
+    MBC1 *impl = CONTAINER_OF(mapper, MBC1, imapper);
+    if (!impl->has_battery) {
+        return RET_OK;
+    }
+
+    FILE *f _autoclose_ = fopen(filename, "rb");
+
+    if (f == NULL) {
+        if (errno == ENOENT) {
+            return RET_OK;
+        }
+
+        TRACE("failed to open file: %s (%d)", filename, errno);
+        return RET_ERR;
+    }
+
+    uint16_t checksum;
+    fread_u16(&checksum, f);
+    fread(impl->ram, impl->ram_size, 1, f);
+
+    if (ferror(f)) {
+        TRACE("failed to read from file: %s", filename);
+        return RET_ERR;
+    }
+
+    if (checksum != impl->rom->header->global_checksum) {
+        TRACE("save file checksum mismatch");
+        return RET_ERR;
+    }
+
+    LOG("loaded battery file: %s", filename);
+
+    return 0;
 }

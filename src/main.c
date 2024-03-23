@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 
 #include "opts.h"
 #include "common.h"
-#include "strbuf.h"
+#include "str.h"
 #include "disasm.h"
 #include "serial.h"
 #include "timer.h"
@@ -90,7 +91,12 @@ gb_print_state(CPU *cpu, MMU *bus, FILE *out)
         mmu_read(bus, cpu->PC + 3),
     };
 
-    fprintf(out, " (%02X %02X %02X %02X)\n", bytes[0], bytes[1], bytes[2], bytes[3]);
+    fprintf(out, " (%02X %02X %02X %02X)", bytes[0], bytes[1], bytes[2], bytes[3]);
+    fputc('\n', out);
+
+    if (ferror(out)) {
+        PANIC("%s", strerror(errno));
+    }
 }
 
 static inline void
@@ -139,11 +145,12 @@ gb_handle_input(MMU *mmu)
 }
 
 static void
-gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state_out)
+gb_run_loop(CPU *cpu, MMU *mmu, FILE *debug_out, FILE *state_out)
 {
     ui_init();
 
     uint64_t ticks = 0;
+    String disasm_str _cleanup_(str_free) = str_new_size(1024);
 
     while (true) {
         if (ticks%4 == 0) {
@@ -153,10 +160,14 @@ gb_run_loop(CPU *cpu, MMU *mmu, Strbuf *disasm_buf, FILE *debug_out, FILE *state
                 }
 
                 if (debug_out != NULL) {
-                    strbuf_clear(disasm_buf);
-                    disasm_step(mmu, cpu, disasm_buf);
-                    fputs(strbuf_get(disasm_buf), debug_out);
+                    disasm_str = str_trunc(disasm_str, 0);
+                    disasm_str = disasm_step(mmu, cpu, disasm_str);
+                    fputs(disasm_str.ptr, debug_out);
                     fputc('\n', debug_out);
+
+                    if (ferror(debug_out)) {
+                        PANIC("%s", strerror(errno));
+                    }
                 }
             }
 
@@ -267,21 +278,31 @@ main(int argc, char **argv)
         exit(1);
     }
 
+    String save_file _cleanup_(str_free) = str_new_from(opts.romfile);
+    save_file = str_add(save_file, ".battery");
+
+    // Load battery-backed RAM
+    if (mapper_load_state(mapper, save_file.ptr) != RET_OK) {
+        LOG("failed to load state file: %s", save_file.ptr);
+        exit(1);
+    }
+
+    // Initialize components
     CPU *cpu _cleanup_(cpu_free) = cpu_new();
-
     PPU *ppu _cleanup_(ppu_free) = ppu_new();
-
     Timer *timer _cleanup_(timer_free) = timer_new();
-
     Serial *serial _cleanup_(serial_free) = serial_new();
-
-    Strbuf *disasm_buf _cleanup_(strbuf_free) = strbuf_new(1024);
-
     Joypad *joypad _cleanup_(joypad_free) = joypad_new();
-
     MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu, joypad);
 
-    gb_run_loop(cpu, mmu, disasm_buf, debug_out, state_out);
+    // Main loop
+    gb_run_loop(cpu, mmu, debug_out, state_out);
+
+    // Save battery-backed RAM
+    if (mapper_save_state(mapper, save_file.ptr) != RET_OK) {
+        LOG("failed to save state file: %s", save_file.ptr);
+        exit(1);
+    }
 
     return 0;
 }

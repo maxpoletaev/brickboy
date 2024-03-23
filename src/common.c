@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdarg.h>
 
 #include "common.h"
 
@@ -32,26 +31,6 @@ xrealloc(void *ptr, size_t old_size, size_t new_size)
     }
 
     return new_ptr;
-}
-
-const char * __attribute__((format(printf, 1, 2)))
-strfmt(const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    static char buf[1024];
-    size_t size = vsnprintf(buf, sizeof(buf), fmt, args);
-
-    if (size < 0) {
-        PANIC("failed to format string");
-    } else if (size >= sizeof(buf)) {
-        PANIC("formatted string is too long");
-    }
-
-    va_end(args);
-
-    return buf;
 }
 
 inline void

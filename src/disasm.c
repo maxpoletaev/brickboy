@@ -3,12 +3,12 @@
 #include <stdio.h>
 
 #include "disasm.h"
-#include "strbuf.h"
 #include "mmu.h"
 #include "cpu.h"
+#include "str.h"
 
 static inline int
-arg_size(ArgType arg)
+disasm_arg_size(ArgType arg)
 {
     switch (arg) {
     case ARG_IMM_8:
@@ -23,7 +23,7 @@ arg_size(ArgType arg)
 }
 
 static inline uint16_t
-arg_value(ArgType arg, MMU *mmu, uint16_t pc)
+disasm_arg_value(ArgType arg, MMU *mmu, uint16_t pc)
 {
     switch (arg) {
     case ARG_IMM_8:
@@ -37,8 +37,8 @@ arg_value(ArgType arg, MMU *mmu, uint16_t pc)
     }
 }
 
-static inline void
-arg_indirect(Strbuf *str, ArgType arg, MMU *mmu, CPU *cpu)
+static inline String
+disasm_add_memval(String str, ArgType arg, MMU *mmu, CPU *cpu)
 {
     uint16_t pc = cpu->PC;
     uint16_t addr = 0;
@@ -48,43 +48,73 @@ arg_indirect(Strbuf *str, ArgType arg, MMU *mmu, CPU *cpu)
     case ARG_IND_C:
         addr = 0xFF00 + cpu->C;
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ (C)=%02X", val);
+        str = str_addf(str, " @ (C)=%02X", val);
         break;
     case ARG_IND_BC:
         addr = cpu->BC;
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ (BC)=%02X", val);
+        str = str_addf(str, " @ (BC)=%02X", val);
         break;
     case ARG_IND_DE:
         addr = cpu->DE;
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ (DE)=%02X", val);
+        str = str_addf(str, " @ (DE)=%02X", val);
         break;
     case ARG_IND_HL:
     case ARG_IND_HLI:
     case ARG_IND_HLD:
         addr = cpu->HL;
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ (HL)=%02X", val);
+        str = str_addf(str, " @ (HL)=%02X", val);
         break;
     case ARG_IND_8:
-        addr = 0xFF00 + arg_value(arg, mmu, pc + 1);
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ ($%02X)=%02X", addr, val);
+        addr = 0xFF00 + disasm_arg_value(arg, mmu, pc + 1);
+        str = str_addf(str, " @ ($%02X)=%02X", addr, val);
         break;
     case ARG_IND_16:
-        addr = arg_value(arg, mmu, pc + 1);
         val = mmu_read(mmu, addr);
-        strbuf_addf(str, " @ ($%04X)=%02X", addr, val);
+        addr = disasm_arg_value(arg, mmu, pc + 1);
+        str = str_addf(str, " @ ($%04X)=%02X", addr, val);
         break;
     default:
         break;
     }
+
+    return str;
 }
 
-static inline void
-format_indirect(Strbuf *str, MMU *mmu, CPU *cpu)
+static inline String
+disasm_format_bytes(String str, MMU *mmu, uint16_t pc)
 {
+    uint8_t opcode = mmu_read(mmu, pc++);
+    str = str_addf(str, "%02X", opcode);
+
+    const Instruction *op = &opcodes[opcode];
+    int opsize = 1;
+
+    if (opcode == 0xCB) {
+        opcode = mmu_read(mmu, pc++);
+        str = str_addf(str, " %02X", opcode);
+        op = &cb_opcodes[opcode];
+        opsize = 2;
+    }
+
+    opsize += disasm_arg_size(op->arg1);
+    opsize += disasm_arg_size(op->arg2);
+
+    // Instruction operands
+    for (int i = 0; i < opsize - 1; i++) {
+        str = str_addf(str, " %02X", mmu_read(mmu, pc++));
+    }
+
+    return str;
+}
+
+static inline String
+disasm_format_text(String str, MMU *mmu, CPU *cpu)
+{
+    uint16_t value;
     uint16_t pc = cpu->PC;
     uint8_t opcode = mmu_read(mmu, pc++);
     const Instruction *op = &opcodes[opcode];
@@ -94,92 +124,56 @@ format_indirect(Strbuf *str, MMU *mmu, CPU *cpu)
         op = &cb_opcodes[opcode];
     }
 
-    arg_indirect(str, op->arg1, mmu, cpu);
-    arg_indirect(str, op->arg2, mmu, cpu);
-}
-
-static inline void
-format_bytes(Strbuf *str, MMU *mmu, uint16_t pc)
-{
-    uint8_t opcode = mmu_read(mmu, pc++);
-    strbuf_addf(str, "%02X", opcode);
-    const Instruction *op = &opcodes[opcode];
-    int opsize = 1;
-
-    if (opcode == 0xCB) {
-        opcode = mmu_read(mmu, pc++);
-        strbuf_addf(str, " %02X", opcode);
-        op = &cb_opcodes[opcode];
-        opsize = 2;
-    }
-
-    opsize += arg_size(op->arg1);
-    opsize += arg_size(op->arg2);
-
-    // Instruction operands
-    for (int i = 0; i < opsize - 1; i++) {
-        strbuf_addf(str, " %02X", mmu_read(mmu, pc++));
-    }
-}
-
-static inline void
-format_text(Strbuf *str, MMU *mmu, uint16_t pc)
-{
-    uint16_t value;
-    uint8_t opcode = mmu_read(mmu, pc++);
-    const Instruction *op = &opcodes[opcode];
-
-    if (opcode == 0xCB) {
-        opcode = mmu_read(mmu, pc++);
-        op = &cb_opcodes[opcode];
-    }
-
     if (op->handler == NULL) {
-        strbuf_addf(str, "???");
-        return;
+        str = str_add(str, "???");
+        return str;
     }
 
     // Instruction text may contain a format specifier, where in instruction
     // containing an immediate operand, the operand value is substituted.
-    if (arg_size(op->arg1) > 0) {
-        value = arg_value(op->arg1, mmu, pc);
-        strbuf_addf(str, op->text, value);
-    } else if (arg_size(op->arg2) > 0) {
-        value = arg_value(op->arg2, mmu, pc);
-        strbuf_addf(str, op->text, value);
+    if (disasm_arg_size(op->arg1) > 0) {
+        value = disasm_arg_value(op->arg1, mmu, pc);
+        str = str_addf(str, op->text, value);
+    } else if (disasm_arg_size(op->arg2) > 0) {
+        value = disasm_arg_value(op->arg2, mmu, pc);
+        str = str_addf(str, op->text, value);
     } else {
-        strbuf_add(str, op->text);
+        str = str_add(str, op->text);
     }
+
+    // Indirect memory value: @ (HL)=00
+    str = disasm_add_memval(str, op->arg1, mmu, cpu);
+    str = disasm_add_memval(str, op->arg2, mmu, cpu);
+
+    return str;
 }
 
-void
-disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf)
+String
+disasm_step(MMU *mmu, CPU *cpu, String str)
 {
     // Program counter: 0x0216
-    strbuf_addf(buf, "  0x%04X: ", cpu->PC);
-    strbuf_pad(buf, 9, ' ');
+    str = str_addf(str, "  0x%04X: ", cpu->PC);
+    str = str_pad(str, 9, ' ');
 
     // Instruction bytes: 20 FC
-    format_bytes(buf, mmu, cpu->PC);
-    strbuf_pad(buf, 28, ' ');
+    str = disasm_format_bytes(str, mmu, cpu->PC);
+    str = str_pad(str, 28, ' ');
 
     // Instruction text: JR NZ,$FC @ (HL)=00
-    format_text(buf, mmu, cpu->PC);
-    format_indirect(buf, mmu, cpu);
-    strbuf_pad(buf, 54, ' ');
+    str = disasm_format_text(str, mmu, cpu);
+    str = str_pad(str, 54, ' ');
 
     // CPU flags: [Z N - C]
-    strbuf_addf(buf, "[%c %c %c %c]",
-                (cpu->flags.zero ? 'Z' : '-'),
-                (cpu->flags.negative ? 'N' : '-'),
-                (cpu->flags.half_carry ? 'H' : '-'),
-                (cpu->flags.carry ? 'C' : '-'));
-    strbuf_pad(buf, 68, ' ');
+    str = str_addf(str, "[%c %c %c %c]",
+                    (cpu->flags.zero ? 'Z' : '-'),
+                    (cpu->flags.negative ? 'N' : '-'),
+                    (cpu->flags.half_carry ? 'H' : '-'),
+                    (cpu->flags.carry ? 'C' : '-'));
+    str = str_pad(str, 68, ' ');
 
     // CPU registers: A:00 B:00 C:00 D:00 E:00 H:00 L:00 SP:0000
-    strbuf_addf(buf, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
-                cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP);
+    str = str_addf(str, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X",
+                    cpu->A, cpu->F, cpu->B, cpu->C, cpu->D, cpu->E, cpu->H, cpu->L, cpu->SP);
 
-    // Interrupts: IE:00 IF:00
-    strbuf_addf(buf, "  IE:%02X IF:%02X", mmu->IE, mmu->IF);
+    return str;
 }

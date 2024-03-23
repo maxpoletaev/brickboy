@@ -7,11 +7,13 @@
 #include "ppu.h"
 
 #define UI_SCALE 3
+#define UI_FPS 60
 #define UI_SHOW_DEBUG_VIEW 0
 #define UI_WINDOW_HEIGHT (144 * UI_SCALE)
 #define UI_WINDOW_WIDTH ((160 * UI_SCALE))
 #define UI_DEBUG_VIEW_WIDTH (128 * (UI_SCALE+1) / 2)
 #define UI_DEBUG_VIEW_HEIGHT (192 * (UI_SCALE+1) / 2)
+#define UI_FILTER TEXTURE_FILTER_POINT
 
 extern const Color ui_palettes[][4];
 

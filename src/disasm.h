@@ -5,6 +5,6 @@
 
 #include "cpu.h"
 #include "mmu.h"
-#include "strbuf.h"
+#include "str.h"
 
-void disasm_step(MMU *mmu, CPU *cpu, Strbuf *buf);
+String disasm_step(MMU *mmu, CPU *cpu, String str);
