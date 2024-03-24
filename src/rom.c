@@ -10,19 +10,17 @@
 static int
 rom_load(ROM *rom, FILE *file, uint32_t file_size)
 {
-    if (file_size < ROM_MIN_SIZE || file_size > ROM_MAX_SIZE) {
-        TRACE("invalid rom size: %d", file_size);
-        return RET_ERR;
-    }
-
     uint8_t *data = xalloc(file_size);
+
     if (fread(data, file_size, 1, file) != 1) {
         TRACE("failed to read rom data");
         xfree(data);
         return RET_ERR;
     }
 
+    BOUNDS_CHECK(file_size, 0x0100 + sizeof(ROMHeader));
     rom->header = (ROMHeader *) (data + 0x0100);
+
     rom->size = file_size;
     rom->data = data;
 
@@ -33,18 +31,17 @@ ROM *
 rom_open(const char *filename)
 {
     ROM *rom = NULL;
-    struct stat file_info;
-    FILE *file _autoclose_ = NULL;
+    struct stat file_info = {0};
+    _autoclose_ FILE *file = fopen(filename, "rb");
 
-    file = fopen(filename, "rb");
     if (file == NULL) {
         TRACE("failed to open file: %s", filename);
-        goto failure;
+        return NULL;
     }
 
     if (stat(filename, &file_info) != 0) {
         TRACE("failed to STAT file: %s", filename);
-        goto failure;
+        return NULL;
     }
 
     rom = xalloc(sizeof(ROM));
@@ -52,7 +49,8 @@ rom_open(const char *filename)
 
     if (rom_load(rom, file, file_size) != RET_OK) {
         TRACE("failed to load rom: %s", filename);
-        goto failure;
+        rom_free(&rom);
+        return NULL;
     }
 
     switch (rom->header->ram_size) {
@@ -75,10 +73,6 @@ rom_open(const char *filename)
     LOG("  ROM Size: %dKB", rom->size / 1024);
 
     return rom;
-
-failure:
-    rom_free(&rom);
-    return NULL;
 }
 
 void

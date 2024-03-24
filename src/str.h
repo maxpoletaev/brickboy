@@ -9,6 +9,8 @@ typedef struct {
     size_t cap;
 } String;
 
+#define str_auto __attribute__((cleanup(str_free))) String
+
 String str_new(void);
 
 String str_new_size(size_t size);

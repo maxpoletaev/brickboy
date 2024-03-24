@@ -4,10 +4,7 @@
 
 #include "common.h"
 
-#define ROM_MIN_SIZE (0x0100 + sizeof(ROMHeader))
-#define ROM_MAX_SIZE (2 * 1024 * 1024) // 2MB
 #define ROM_TITLE_SIZE 16
-
 #define ROM_BANK_SIZE 0x4000
 #define RAM_BANK_SIZE 0x2000
 

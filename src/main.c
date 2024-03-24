@@ -150,7 +150,7 @@ gb_run_loop(CPU *cpu, MMU *mmu, FILE *debug_out, FILE *state_out)
     ui_init();
 
     uint64_t ticks = 0;
-    String disasm_str _cleanup_(str_free) = str_new_size(1024);
+    str_auto disasm_buf = str_new_size(1024);
 
     while (true) {
         if (ticks%4 == 0) {
@@ -160,9 +160,9 @@ gb_run_loop(CPU *cpu, MMU *mmu, FILE *debug_out, FILE *state_out)
                 }
 
                 if (debug_out != NULL) {
-                    disasm_str = str_trunc(disasm_str, 0);
-                    disasm_str = disasm_step(mmu, cpu, disasm_str);
-                    fputs(disasm_str.ptr, debug_out);
+                    disasm_buf = str_trunc(disasm_buf, 0);
+                    disasm_buf = disasm_step(mmu, cpu, disasm_buf);
+                    fputs(disasm_buf.ptr, debug_out);
                     fputc('\n', debug_out);
 
                     if (ferror(debug_out)) {
@@ -262,7 +262,7 @@ main(int argc, char **argv)
     }
 
     // CPU state output
-    FILE *state_out _autoclose_ = NULL;
+    _autoclose_ FILE *state_out = NULL;
     if (opts.state_out != NULL) {
         state_out = output_file(opts.state_out);
         if (state_out == NULL) {
@@ -272,7 +272,7 @@ main(int argc, char **argv)
     }
 
     // Runtime disassembly output
-    FILE *debug_out _autoclose_ = NULL;
+    _autoclose_ FILE *debug_out = NULL;
     if (opts.debug_out != NULL) {
         debug_out = output_file(opts.debug_out);
         if (debug_out == NULL) {
@@ -281,19 +281,19 @@ main(int argc, char **argv)
         }
     }
 
-    ROM *rom _cleanup_(rom_free) = rom_open(opts.romfile);
+    _cleanup_(rom_free) ROM *rom = rom_open(opts.romfile);
     if (rom == NULL) {
         LOG("failed to open rom file: %s", opts.romfile);
         exit(1);
     }
 
-    IMapper *mapper _cleanup_(mapper_free) = gb_get_mapper(rom);
+    _cleanup_(mapper_free) IMapper *mapper  = gb_get_mapper(rom);
     if (mapper == NULL) {
         LOG("failed to load rom: %s", opts.romfile);
         exit(1);
     }
 
-    String save_file _cleanup_(str_free) = str_new_from(opts.romfile);
+    str_auto save_file = str_new_from(opts.romfile);
     save_file = gb_trunc_ext(save_file);
     save_file = str_add(save_file, ".save");
 
@@ -304,12 +304,12 @@ main(int argc, char **argv)
     }
 
     // Initialize components
-    CPU *cpu _cleanup_(cpu_free) = cpu_new();
-    PPU *ppu _cleanup_(ppu_free) = ppu_new();
-    Timer *timer _cleanup_(timer_free) = timer_new();
-    Serial *serial _cleanup_(serial_free) = serial_new();
-    Joypad *joypad _cleanup_(joypad_free) = joypad_new();
-    MMU *mmu _cleanup_(mmu_free) = mmu_new(mapper, serial, timer, ppu, joypad);
+    _cleanup_(cpu_free) CPU *cpu = cpu_new();
+    _cleanup_(ppu_free) PPU *ppu = ppu_new();
+    _cleanup_(timer_free) Timer *timer = timer_new();
+    _cleanup_(serial_free) Serial *serial = serial_new();
+    _cleanup_(joypad_free) Joypad *joypad = joypad_new();
+    _cleanup_(mmu_free) MMU *mmu = mmu_new(mapper, serial, timer, ppu, joypad);
 
     // Main loop
     gb_run_loop(cpu, mmu, debug_out, state_out);

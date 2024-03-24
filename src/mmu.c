@@ -161,17 +161,15 @@ mmu_write(MMU *mmu, uint16_t addr, uint8_t data)
 uint16_t
 mmu_read16(MMU *mmu, uint16_t addr)
 {
-    uint16_t val = 0;
-    val |= (uint16_t) mmu_read(mmu, addr + 0) << 0;
-    val |= (uint16_t) mmu_read(mmu, addr + 1) << 8;
-    return val;
+    return (mmu_read(mmu, addr+0) << 0) |
+           (mmu_read(mmu, addr+1) << 8);
 }
 
 void
 mmu_write16(MMU *mmu, uint16_t addr, uint16_t data)
 {
-    mmu_write(mmu, addr + 0, (uint8_t) (data >> 0));
-    mmu_write(mmu, addr + 1, (uint8_t) (data >> 8));
+    mmu_write(mmu, addr+0, data >> 0);
+    mmu_write(mmu, addr+1, data >> 8);
 }
 
 static void

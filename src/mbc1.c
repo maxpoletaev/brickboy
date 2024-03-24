@@ -120,11 +120,10 @@ mbc1_save(IMapper *mapper, const char *filename)
         return RET_OK;
     }
 
-    String tmpfile _cleanup_(str_free) = str_new();
-    tmpfile = str_add(tmpfile, filename);
-    tmpfile = str_add(tmpfile, ".tmp");
+    str_auto tmp_filename = str_new_from(filename);
+    tmp_filename = str_add(tmp_filename, ".tmp");
 
-    FILE *f _autoclose_ = fopen(tmpfile.ptr, "wb");
+    _autoclose_ FILE *f = fopen(tmp_filename.ptr, "wb");
 
     if (f == NULL) {
         TRACE("failed to open file: %s", filename);
@@ -139,7 +138,7 @@ mbc1_save(IMapper *mapper, const char *filename)
         return RET_ERR;
     }
 
-    if (rename(tmpfile.ptr, filename) != 0) {
+    if (rename(tmp_filename.ptr, filename) != 0) {
         TRACE("failed to rename file: %s", filename);
         return RET_ERR;
     }
@@ -157,7 +156,7 @@ mbc1_load(IMapper *mapper, const char *filename)
         return RET_OK;
     }
 
-    FILE *f _autoclose_ = fopen(filename, "rb");
+    _autoclose_ FILE *f = fopen(filename, "rb");
 
     if (f == NULL) {
         if (errno == ENOENT) {

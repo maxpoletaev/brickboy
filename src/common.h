@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <unistd.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -20,12 +21,6 @@
 #define BOUNDS_CHECK(size, index) if ((index) >= (size)) PANIC("index out of bounds: %u", (uint32_t)(index))
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
-#define SETBIT(x, n) ((x) |= (1 << (n)))
-
-#define CLRBIT(x, n) ((x) &= ~(1 << (n)))
-
-#define GETBIT(x, n) (((x) >> (n)) & 1)
 
 #define PANIC(fmt, ...) \
     do { \
