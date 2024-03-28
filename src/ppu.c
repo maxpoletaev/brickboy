@@ -525,7 +525,6 @@ ppu_stat_interrupt(PPU *ppu)
     }
 
     return false;
-
 }
 
 inline bool

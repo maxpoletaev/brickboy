@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -38,8 +39,8 @@ static struct {
     RenderTexture2D frame_texture;
     Color tileset_pixels[128*192];
     RenderTexture2D tileset_texture;
+    size_t palette;
     bool debug;
-    int palette;
 } ui;
 
 void
@@ -162,7 +163,7 @@ ui_handle_hotkeys(void)
 
     // Cycle through palettes
     if (IsKeyPressed(KEY_F2)) {
-        ui.palette = (int) ((ui.palette + 1) % ARRAY_SIZE(ui_palettes));
+        ui.palette = (ui.palette+1) % ARRAY_SIZE(ui_palettes);
         return;
     }
 
@@ -176,11 +177,8 @@ ui_handle_hotkeys(void)
 void
 ui_refresh(void)
 {
-
     BeginDrawing();
     ClearBackground(PURPLE);
-
-    ui_handle_hotkeys();
 
     static Vector2 origin = (Vector2) {0, 0};
 
@@ -192,7 +190,9 @@ ui_refresh(void)
     static Rectangle tileset_srect = (Rectangle) {160*UI_SCALE, 0, (int) UI_DEBUG_VIEW_WIDTH, (int) UI_DEBUG_VIEW_HEIGHT};
     DrawTexturePro(ui.tileset_texture.texture, tileset_rect, tileset_srect, origin, 0, WHITE);
 
+    ui_handle_hotkeys();
     ui_draw_fps_counter();
+
     EndDrawing();
 }
 

@@ -108,23 +108,24 @@ String
 str_addf(String str, const char *fmt, ...)
 {
     va_list args;
+    va_list args2;
 
     // Determine the length of the formatted string.
     va_start(args, fmt);
-    size_t wrlen = vsnprintf(NULL, 0, fmt, args);
+    va_copy(args2, args);
+    int wrlen = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
 
     if (wrlen < 0) {
         PANIC("vsnprintf failed");
     }
 
-    size_t newlen = str.len+wrlen;
+    size_t newlen = str.len + (size_t) wrlen;
     str = str_grow(str, newlen);
 
     // Write the formatted string
-    va_start(args, fmt);
-    wrlen = vsnprintf(str.ptr+str.len, str.cap-str.len, fmt, args);
-    va_end(args);
+    wrlen = vsnprintf(str.ptr+str.len, str.cap-str.len, fmt, args2);
+    va_end(args2);
 
     if (wrlen < 0) {
         PANIC("vsnprintf failed");

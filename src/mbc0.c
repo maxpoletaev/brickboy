@@ -1,9 +1,8 @@
-#include "mbc0.h"
-
 #include <stdint.h>
 
 #include "common.h"
 #include "mapper.h"
+#include "mbc0.h"
 #include "rom.h"
 
 static IMapper mbc0_mapper = {

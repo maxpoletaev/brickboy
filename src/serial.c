@@ -19,13 +19,15 @@ void serial_free(Serial **s)
 }
 
 void
-serial_reset(Serial *s) {
+serial_reset(Serial *s)
+{
     s->byte = 0;
     s->ctrl = 0;
 }
 
 uint8_t
-serial_read(Serial *s, uint16_t addr) {
+serial_read(Serial *s, uint16_t addr)
+{
     switch (addr) {
     case 0xFF01:
         return s->byte;
@@ -37,7 +39,8 @@ serial_read(Serial *s, uint16_t addr) {
 }
 
 void
-serial_write(Serial *s, uint16_t addr, uint8_t val) {
+serial_write(Serial *s, uint16_t addr, uint8_t val)
+{
     switch (addr) {
     case 0xFF01:
         s->byte = val;

@@ -14,7 +14,7 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(raylib 4.2 REQUIRED)
 
 add_compile_options(
-    -Wall -Wextra -Wpedantic -Wimplicit-fallthrough
+    -Wall -Wextra -Wpedantic -Wimplicit-fallthrough -Wsign-conversion
     -Wno-gnu-zero-variadic-macro-arguments
     -Wno-gnu-case-range)
 

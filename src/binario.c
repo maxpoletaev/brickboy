@@ -70,7 +70,6 @@ fread_u32(uint32_t *data, FILE *file)
     }
 
     return ret;
-
 }
 
 size_t

@@ -339,7 +339,7 @@ cpu_execute(CPU *cpu, MMU *bus)
 
     // EI takes effect one instruction later
     if (cpu->ime_delay != -1) {
-        cpu->IME = cpu->ime_delay;
+        cpu->IME = (uint8_t) cpu->ime_delay;
         cpu->ime_delay = -1;
     }
 
