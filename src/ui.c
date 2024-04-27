@@ -46,8 +46,9 @@ static struct {
 void
 ui_init(void)
 {
-    SetTargetFPS(60);
     SetTraceLogLevel(LOG_ERROR);
+    SetTargetFPS(60);
+
     InitWindow(UI_WINDOW_WIDTH, UI_WINDOW_HEIGHT, "BrickBoy");
 
     if (UI_SHOW_DEBUG_VIEW) {

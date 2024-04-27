@@ -45,10 +45,10 @@ make
  * [x] DMA
  * [x] Sprites 8x8
  * [x] Sprites 8x16
- * [ ] Scrolling
+ * [x] Scrolling
  * [ ] Sound
  * [x] Input
- * [ ] Mappers
+ * [x] Mappers
  * [x] Boot ROM
  * [x] Battery save
 
@@ -71,15 +71,24 @@ make
 
 | Game | Status | Notes |
 |------|--------|-------|
-| Tetris | Playable ||
+| Battletoads Double Dragon - The Ultimate Team | Playable ||
+| Contra: The Alien Wars | Playable ||
+| Darkwing Duck | Playable ||
+| Donkey Kong Land 3 | Has issues | Colors are inverted |
 | Dr. Mario | Playable ||
+| Duck Tales 2 | Playable ||
+| Kirby's Dream Land | Playable ||
 | Super Mario Land | Playable ||
+| Super Mario Land 2: 6 Golden Coins | Crashes ||
+| Tetris | Playable ||
 | The Legend of Zelda: Link's Awakening | Playable ||
+| V-Rally - Championship Edition | Playable ||
 
 ## Resources
 
 - [Pan Docs](https://gbdev.io/pandocs/)
 - [CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
+- [The Ultimate Game Boy Talk](https://www.youtube.com/watch?v=HyzD8pNlpwI) (Video) by Michael Steil
 - [Opcodes Table](https://meganesu.github.io/generate-gb-opcodes/) by meganesu
 - [Gameboy Logs](https://github.com/wheremyfoodat/Gameboy-logs) by wheremyfoodat
 - [Test ROMs](https://github.com/retrio/gb-test-roms) (mirror of Blargg’s tests)
