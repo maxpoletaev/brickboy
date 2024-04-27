@@ -15,6 +15,7 @@ typedef struct MBC1 {
     uint8_t *ram;
     uint8_t rom_bank;
     uint8_t ram_bank;
+    uint8_t mode_select;
 } MBC1;
 
 IMapper *mbc1_new(ROM *rom);

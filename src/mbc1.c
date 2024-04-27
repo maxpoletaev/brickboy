@@ -30,7 +30,7 @@ mbc1_new(ROM *rom)
     impl->ram = xalloc(rom->ram_size);
     impl->ram_size = rom->ram_size;
 
-    if (impl->rom->header->type == ROM_TYPE_MBC1_RAM_BATT) {
+    if (rom->header->type == ROM_TYPE_MBC1_RAM_BATT) {
         impl->has_battery = true;
     }
 
@@ -72,8 +72,7 @@ mbc1_read(IMapper *mapper, uint16_t addr)
     case 0xA000 ... 0xBFFF: // RAM bank
         if (impl->ram_enabled) {
             ram_addr = RAM_BANK_SIZE * impl->ram_bank + addr-0xA000;
-            BOUNDS_CHECK(impl->ram_size, ram_addr);
-            return impl->ram[ram_addr];
+            return impl->ram[ram_addr % impl->ram_size];
         }
         return 0xFF;
     default:
@@ -92,20 +91,26 @@ mbc1_write(IMapper *mapper, uint16_t addr, uint8_t data)
         impl->ram_enabled = (data & 0x0F) == 0x0A;
         break;
     case 0x2000 ... 0x3FFF: // ROM bank
-        impl->rom_bank = data & 0x1F;
+        impl->rom_bank = (impl->rom_bank & 0xE0) | (data & 0x1F);
         if (impl->rom_bank == 0) {
             impl->rom_bank = 1;
         }
         break;
     case 0x4000 ... 0x5FFF: // RAM bank
-        impl->ram_bank = data;
+        if (impl->mode_select == 1) {
+            impl->rom_bank |= (data & 0x03) << 5;
+        } else {
+            impl->ram_bank = data;
+        }
         break;
     case 0xA000 ... 0xBFFF: // RAM data
         if (impl->ram_enabled) {
             ram_addr = RAM_BANK_SIZE * impl->ram_bank + addr-0xA000;
-            BOUNDS_CHECK(impl->ram_size, ram_addr);
-            impl->ram[ram_addr] = data;
+            impl->ram[ram_addr % impl->ram_size] = data;
         }
+        break;
+    case 0x6000 ... 0x7FFF: // Mode select
+        impl->mode_select = data & 0x01;
         break;
     default:
         PANIC("unknown write address: 0x%04X", addr);
